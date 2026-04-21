@@ -94,29 +94,13 @@ CREATE TYPE autonomy_level AS ENUM (
 );
 
 -- =====================================================
--- PLANOS (Plans)
+-- TODO: Implementar PLANOS (Plans) - Sprint 5
+-- Os desenvolvedores devem criar esta tabela conforme evolução
+-- Sugestão de campos: name, price_monthly, price_yearly, max_users, 
+-- max_tickets, features (JSONB), etc.
 -- =====================================================
 
-CREATE TABLE plans (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(100) NOT NULL UNIQUE,
-    display_name VARCHAR(200) NOT NULL,
-    price_monthly DECIMAL(10, 2) NOT NULL,
-    price_yearly DECIMAL(10, 2) NOT NULL,
-    max_users INTEGER NOT NULL DEFAULT 3,
-    max_tickets_monthly INTEGER NOT NULL DEFAULT 100,
-    max_knowledge_base_docs INTEGER NOT NULL DEFAULT 1,
-    max_agents INTEGER NOT NULL DEFAULT 1,
-    features JSONB DEFAULT '[]',
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO plans (name, display_name, price_monthly, price_yearly, max_users, max_tickets_monthly, max_knowledge_base_docs, features) VALUES
-('starter', 'Starter', 97.00, 873.00, 3, 100, 1, '["rag", "basic_reports"]'),
-('pro', 'Pro', 297.00, 2673.00, 10, 500, 5, '["rag", "advanced_reports", "custom_prompt", "tools"]'),
-('enterprise', 'Enterprise', 797.00, 7173.00, -1, -1, -1, '["rag", "advanced_reports", "custom_prompt", "tools", "api_access", "sla_priority"]');
+-- CREATE TABLE plans (...);
 
 -- =====================================================
 -- EMPRESAS (Companies/Tenants)
@@ -127,9 +111,9 @@ CREATE TABLE companies (
     name VARCHAR(255) NOT NULL,
     domain VARCHAR(255) UNIQUE,
     logo_url VARCHAR(500),
-    plan_id INTEGER REFERENCES plans(id),
-    plan_started_at TIMESTAMP WITH TIME ZONE,
-    plan_expires_at TIMESTAMP WITH TIME ZONE,
+    -- TODO: plan_id INTEGER REFERENCES plans(id), -- Sprint 5
+    -- TODO: plan_started_at TIMESTAMP WITH TIME ZONE, -- Sprint 5
+    -- TODO: plan_expires_at TIMESTAMP WITH TIME ZONE, -- Sprint 5
     
     -- Status
     status company_status DEFAULT 'pending',
@@ -163,7 +147,7 @@ CREATE TABLE companies (
 
 CREATE INDEX idx_companies_domain ON companies(domain);
 CREATE INDEX idx_companies_status ON companies(status);
-CREATE INDEX idx_companies_plan ON companies(plan_id);
+-- TODO: CREATE INDEX idx_companies_plan ON companies(plan_id); -- Sprint 5
 
 -- =====================================================
 -- USUÁRIOS (Users)
@@ -654,17 +638,19 @@ CREATE TABLE company_ai_config (
     id SERIAL PRIMARY KEY,
     company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE UNIQUE,
     
-    -- Provider & Credentials
-    provider_id INTEGER NOT NULL,
-    api_key_encrypted TEXT,  -- Criptografado com AES-256
+    -- Provider & Credentials (OpenRouter é o único recomendado)
+    -- Cada empresa tem sua própria API key armazenada
+    provider_id INTEGER REFERENCES ai_providers(id),  -- Aponta para OpenRouter por padrão
+    api_key_encrypted TEXT,  -- Chave OpenRouter do cliente (criptografada AES-256)
+    api_key_is_set BOOLEAN DEFAULT FALSE,  -- TRUE se a chave foi configurada
     
-    -- LLM Settings
-    llm_model VARCHAR(100) NOT NULL,
+    -- LLM Settings (modelo OpenRouter)
+    llm_model VARCHAR(100) NOT NULL DEFAULT 'google/gemini-1.5-flash',
     temperature DECIMAL(3,2) DEFAULT 0.7,
     max_tokens INTEGER DEFAULT 2048,
     
-    -- RAG Settings
-    embedding_model VARCHAR(100) DEFAULT 'text-embedding-3-small',
+    -- RAG Settings (usando OpenAI embeddings para embeddings)
+    embedding_model VARCHAR(100) DEFAULT 'openai/text-embedding-3-small',
     embedding_dimensions INTEGER DEFAULT 1536,
     
     -- Prompt
@@ -698,9 +684,9 @@ CREATE TABLE ai_providers (
 );
 
 INSERT INTO ai_providers (name, display_name, api_url) VALUES
+('openrouter', 'OpenRouter', 'https://openrouter.ai/api/v1'),
 ('openai', 'OpenAI', 'https://api.openai.com/v1'),
 ('anthropic', 'Anthropic', 'https://api.anthropic.com/v1'),
-('cohere', 'Cohere', 'https://api.cohere.ai/v1'),
 ('local', 'Local/Ollama', 'http://localhost:11434/v1');
 
 -- =====================================================
@@ -721,15 +707,23 @@ CREATE TABLE ai_models (
     UNIQUE(provider_id, name, model_type)
 );
 
--- Modelos LLM
+-- Modelos LLM via OpenRouter (ordenados por preço: mais barato primeiro)
+-- Formato: provider/model (OpenRouter API)
 INSERT INTO ai_models (provider_id, name, display_name, model_type, max_tokens, supports_function_calling) VALUES
-(1, 'gpt-4o', 'GPT-4o', 'llm', 128000, TRUE),
-(1, 'gpt-4o-mini', 'GPT-4o Mini', 'llm', 128000, TRUE),
-(1, 'gpt-4-turbo', 'GPT-4 Turbo', 'llm', 128000, TRUE),
-(1, 'gpt-3.5-turbo', 'GPT-3.5 Turbo', 'llm', 16385, TRUE),
-(2, 'claude-3-5-sonnet', 'Claude 3.5 Sonnet', 'llm', 200000, TRUE),
-(2, 'claude-3-opus', 'Claude 3 Opus', 'llm', 200000, TRUE),
-(2, 'claude-3-haiku', 'Claude 3 Haiku', 'llm', 200000, FALSE);
+-- OpenRouter - Modelos FREE
+(1, 'google/gemini-2.0-flash-exp', 'Gemini 2.0 Flash (FREE)', 'llm', 1000000, TRUE),
+(1, 'google/gemini-1.5-flash', 'Gemini 1.5 Flash (FREE)', 'llm', 1000000, TRUE),
+(1, 'google/gemini-1.5-flash-8b', 'Gemini 1.5 Flash 8B (FREE)', 'llm', 1000000, TRUE),
+(1, 'meta-llama/llama-3.1-8b-instruct', 'Llama 3.1 8B (FREE)', 'llm', 8192, FALSE),
+(1, 'mistralai/mistral-7b-instruct', 'Mistral 7B (FREE)', 'llm', 32768, FALSE),
+-- OpenRouter - Modelos PAGOS (bons e baratos)
+(1, 'openai/gpt-4o-mini', 'GPT-4o Mini', 'llm', 128000, TRUE),
+(1, 'openai/gpt-4o', 'GPT-4o', 'llm', 128000, TRUE),
+(1, 'anthropic/claude-3.5-sonnet', 'Claude 3.5 Sonnet', 'llm', 200000, TRUE),
+(1, 'anthropic/claude-3-haiku', 'Claude 3 Haiku', 'llm', 200000, FALSE),
+-- OpenRouter - Modelos Premium
+(1, 'anthropic/claude-sonnet-4-20250514', 'Claude Sonnet 4', 'llm', 200000, TRUE),
+(1, 'anthropic/claude-opus-4-20250514', 'Claude Opus 4', 'llm', 200000, TRUE);
 
 -- Modelos de Embedding
 INSERT INTO ai_models (provider_id, name, display_name, model_type, embedding_dimensions) VALUES
@@ -916,7 +910,7 @@ ALTER TABLE knowledge_base ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE companies IS 'Empresas/Tenants do sistema';
 COMMENT ON TABLE users IS 'Usuários do sistema (clientes, atendentes, admins)';
-COMMENT ON TABLE plans IS 'Planos de assinatura';
+-- COMMENT ON TABLE plans IS 'Planos de assinatura'; -- Sprint 5
 COMMENT ON TABLE categories IS 'Categorias de tickets por empresa';
 COMMENT ON TABLE tickets IS 'Tickets de suporte';
 COMMENT ON TABLE ticket_messages IS 'Mensagens dentro de um ticket';

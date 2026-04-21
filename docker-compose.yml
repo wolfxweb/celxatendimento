@@ -1,0 +1,200 @@
+# celx-atendimento - Docker Compose
+# Sistema completo com PostgreSQL, PgAdmin, Backend e Frontend
+
+services:
+  # =====================================================
+  # POSTGRESQL + pgvector
+  # =====================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: celx-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: celx_atendimento
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: celx123456
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    networks:
+      - celx-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d celx_atendimento"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # =====================================================
+  # PGADMIN (Admin do PostgreSQL)
+  # =====================================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: celx-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@celx.com.br
+      PGADMIN_DEFAULT_PASSWORD: celx123456
+      PGADMIN_SERVER_JSON_FILE: /pgadmin4/servers.json
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./database/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - celx-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # =====================================================
+  # BACKEND (FastAPI + LangChain + LangGraph)
+  # =====================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: celx-backend
+    restart: unless-stopped
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://postgres:celx123456@postgres:5432/celx_atendimento
+      SYNC_DATABASE_URL: postgresql://postgres:celx123456@postgres:5432/celx_atendimento
+      
+      # Redis (para Celery/Background tasks)
+      REDIS_URL: redis://redis:6379/0
+      
+      # Langfuse (Observabilidade)
+      LANGFUSE_PUBLIC_KEY: pk-lf-...
+      LANGFUSE_SECRET_KEY: sk-lf-...
+      LANGFUSE_HOST: http://langfuse:3000
+      
+      # JWT
+      SECRET_KEY: sua-chave-secreta-muito-longa-aqui-123456789
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 60
+      
+      # Encryption (para API keys dos clientes)
+      ENCRYPTION_KEY: sua-chave-32-bytes-aqui123456789012345678901234
+      
+      # OpenRouter (URL padrão - cada cliente tem sua própria chave no banco)
+      OPENROUTER_API_URL: https://openrouter.ai/api/v1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - uploads_data:/app/uploads
+    networks:
+      - celx-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+  # =====================================================
+  # FRONTEND (Next.js)
+  # =====================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: celx-frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    networks:
+      - celx-network
+    depends_on:
+      - backend
+
+  # =====================================================
+  # REDIS (para Celery/Background Tasks)
+  # =====================================================
+  redis:
+    image: redis:7-alpine
+    container_name: celx-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - celx-network
+
+  # =====================================================
+  # LANGFUSE (Observabilidade AI)
+  # =====================================================
+  langfuse:
+    image: langfuse/langfuse:latest
+    container_name: celx-langfuse
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:celx123456@postgres:5432/langfuse
+      NEXTAUTH_SECRET: langfuse-secret-key-123456
+      NEXTAUTH_URL: http://localhost:3000
+      SALT: langfuse-salt-123456
+      TELEMETRY_ENABLED: "false"
+    ports:
+      - "3001:3000"
+    volumes:
+      - langfuse_data:/app/data
+    networks:
+      - celx-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # =====================================================
+  # CELERY WORKER (Background Tasks)
+  # =====================================================
+  celery:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: celx-celery
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:celx123456@postgres:5432/celx_atendimento
+      REDIS_URL: redis://redis:6379/0
+      LANGFUSE_PUBLIC_KEY: pk-lf-...
+      LANGFUSE_SECRET_KEY: sk-lf-...
+      LANGFUSE_HOST: http://langfuse:3000
+      OPENROUTER_API_URL: https://openrouter.ai/api/v1
+    volumes:
+      - ./backend:/app
+    networks:
+      - celx-network
+    depends_on:
+      - postgres
+      - redis
+      - langfuse
+    command: celery -A app.tasks.celery_app worker --loglevel=info
+
+# =====================================================
+# REDES
+# =====================================================
+networks:
+  celx-network:
+    driver: bridge
+
+# =====================================================
+# VOLUMES
+# =====================================================
+volumes:
+  postgres_data:
+  pgadmin_data:
+  redis_data:
+  langfuse_data:
+  uploads_data:

@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "celx_atendimento",
+      "Group": "Celx",
+      "Host": "postgres",
+      "Port": 5432,
+      "Database": "celx_atendimento",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "MaintenanceDB": "postgres"
+    }
+  }
+}
