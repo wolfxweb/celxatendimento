@@ -1,0 +1,22 @@
+# Regras Globais para Agentes AI (Antigravity & Kilo/Roo Code)
+
+Bem-vindo ao projeto `celx-atendimento`. Este repositório utiliza múltiplos agentes de IA para ajudar no desenvolvimento.
+
+## Estrutura de Agentes
+A pasta `agents/` contém instruções específicas para diferentes perfis de IA.
+Sempre que assumir um papel, verifique os arquivos em `agents/` para entender melhor suas responsabilidades.
+
+## Atalhos e Modos (Roo Code)
+Se você estiver usando o Roo Code, os seguintes modos estão disponíveis via atalho:
+- **Product Manager** (`/product-manager`)
+- **Arquiteto de Software** (`/architect`)
+- **Desenvolvedor Frontend** (`/dev-frontend`)
+- **Desenvolvedor Backend** (`/dev-backend`)
+
+## Como o Antigravity deve agir
+O Antigravity (eu) deve ler o contexto geral da pasta `agents/` quando solicitado para atuar em um escopo específico. Caso o usuário peça para focar em "Backend", devo seguir as diretrizes do arquivo correspondente.
+
+## Regras de Código
+1. Sempre escreva código limpo, documentado e em português (ou inglês, conforme o padrão definido).
+2. Não altere arquivos fora do escopo da sua tarefa atual.
+3. Antes de criar novas dependências, valide com o usuário.
