@@ -7,7 +7,7 @@
 -- =====================================================
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "pgvector";
+-- CREATE EXTENSION IF NOT EXISTS "pgvector";  -- Sprint 2+ (requer instalação manual)
 
 -- =====================================================
 -- ENUMS
@@ -52,6 +52,7 @@ CREATE TYPE ai_provider_name AS ENUM (
     'openai',
     'anthropic',
     'cohere',
+    'openrouter',
     'local'
 );
 
@@ -118,7 +119,7 @@ CREATE TABLE companies (
     -- Status
     status company_status DEFAULT 'pending',
     status_reason TEXT,
-    approved_by INTEGER REFERENCES users(id),
+    approved_by INTEGER, -- REFERENCES users(id) -- Added after users table creation
     approved_at TIMESTAMP WITH TIME ZONE,
     
     -- Configurações da empresa
@@ -602,8 +603,9 @@ CREATE TABLE knowledge_base (
     source_url VARCHAR(1000),
     original_filename VARCHAR(255),  -- Para PDFs
     
-    -- Embeddings (pgvector)
-    embedding vector(1536),  -- Dimensão do text-embedding-3-small
+    -- Embeddings (text for now - enable pgvector for vector support in Sprint 2+)
+    -- embedding vector(1536),  -- Dimensão do text-embedding-3-small
+    embedding_text TEXT,  -- Armazena texto original para recuperação
     
     -- Chunking info
     chunks_count INTEGER DEFAULT 1,
@@ -627,8 +629,7 @@ CREATE TABLE knowledge_base (
 CREATE INDEX idx_knowledge_company ON knowledge_base(company_id);
 CREATE INDEX idx_knowledge_active ON knowledge_base(is_active);
 CREATE INDEX idx_knowledge_indexed ON knowledge_base(is_indexed);
--- Índice vetorial para busca de相似idade
-CREATE INDEX idx_knowledge_embedding ON knowledge_base USING ivfflat (embedding vector_cosine_ops);
+-- CREATE INDEX idx_knowledge_embedding ON knowledge_base USING ivfflat (embedding vector_cosine_ops);  -- Enable with pgvector
 
 -- =====================================================
 -- CONFIGURAÇÃO AI DA EMPRESA (Company AI Config)
@@ -905,10 +906,16 @@ ALTER TABLE knowledge_base ENABLE ROW LEVEL SECURITY;
 -- CREATE POLICY users_company ON users USING (company_id = current_setting('app.current_company_id')::INTEGER);
 
 -- =====================================================
--- COMMENTS
+-- FOREIGN KEY CONSTRAINTS (after all tables created)
 -- =====================================================
 
-COMMENT ON TABLE companies IS 'Empresas/Tenants do sistema';
+ALTER TABLE companies ADD CONSTRAINT fk_companies_approved_by FOREIGN KEY (approved_by) REFERENCES users(id) ON DELETE SET NULL;
+
+-- =====================================================
+-- ROW LEVEL SECURITY
+-- =====================================================
+
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 COMMENT ON TABLE users IS 'Usuários do sistema (clientes, atendentes, admins)';
 -- COMMENT ON TABLE plans IS 'Planos de assinatura'; -- Sprint 5
 COMMENT ON TABLE categories IS 'Categorias de tickets por empresa';

@@ -1,0 +1,173 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { isAuthenticated, getToken } from '@/lib/auth'
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const router = useRouter()
+  const [user, setUser] = useState<{ email: string; role: string; full_name: string } | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      router.push('/login')
+      return
+    }
+
+    try {
+      const token = getToken()
+      if (token) {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        setUser({
+          email: payload.email || '',
+          role: payload.role || 'customer',
+          full_name: payload.full_name || 'User',
+        })
+      }
+    } catch (e) {
+      console.error('Error decoding token:', e)
+    }
+    setLoading(false)
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-primary-500/30 border-t-primary-500 rounded-full animate-spin"></div>
+          <div className="absolute inset-0 w-16 h-16 border-4 border-transparent border-t-violet-500 rounded-full animate-spin" style={{ animationDelay: '0.15s' }}></div>
+        </div>
+      </div>
+    )
+  }
+
+  const navItems = [
+    { href: '/dashboard/cliente/tickets', label: 'Meus Tickets', icon: '🎫' },
+    { href: '/dashboard/atendente/tickets', label: 'Tickets', icon: '📋' },
+    { href: '/dashboard/atendente/aprovacao', label: 'Aprovar IA', icon: '🤖', badge: true },
+  ]
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-slate-100">
+      {/* Modern Sidebar */}
+      <aside className={`fixed top-0 left-0 h-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 z-50 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'}`}>
+        {/* Logo */}
+        <div className="p-6 border-b border-slate-700/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-glow-primary">
+              <span className="text-white font-bold text-lg">C</span>
+            </div>
+            {sidebarOpen && (
+              <span className="text-xl font-bold text-white bg-clip-text text-transparent bg-gradient-to-r from-primary-400 to-violet-400">
+                celx-atendimento
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Toggle Button */}
+        <button 
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="absolute -right-3 top-20 w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-slate-600 transition-colors"
+        >
+          {sidebarOpen ? '◀' : '▶'}
+        </button>
+
+        {/* Navigation */}
+        <nav className="p-4 space-y-2">
+          {navItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/50 transition-all duration-200 group"
+            >
+              <span className="text-xl group-hover:scale-110 transition-transform">{item.icon}</span>
+              {sidebarOpen && (
+                <span className="font-medium group-hover:text-primary-400 transition-colors">{item.label}</span>
+              )}
+              {item.badge && sidebarOpen && (
+                <span className="ml-auto px-2 py-0.5 bg-violet-500/20 text-violet-300 rounded-full text-xs font-medium">
+                  NEW
+                </span>
+              )}
+            </Link>
+          ))}
+        </nav>
+
+        {/* User Section at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-700/50">
+          <div className={`flex items-center gap-3 ${!sidebarOpen && 'justify-center'}`}>
+            <div className="w-10 h-10 rounded-xl bg-gradient-secondary flex items-center justify-center">
+              <span className="text-white font-semibold">
+                {user?.full_name?.charAt(0).toUpperCase() || 'U'}
+              </span>
+            </div>
+            {sidebarOpen && (
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-sm font-medium truncate">{user?.full_name}</p>
+                <p className="text-slate-400 text-xs truncate">{user?.email}</p>
+              </div>
+            )}
+          </div>
+          {sidebarOpen && (
+            <Link
+              href="/login"
+              onClick={() => localStorage.removeItem('celx_token')}
+              className="mt-3 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-700/50 text-slate-300 hover:text-white hover:bg-red-500/20 hover:text-red-400 transition-all duration-200 text-sm"
+            >
+              <span>⬆</span> Sair
+            </Link>
+          )}
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
+        {/* Top Header Bar */}
+        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 shadow-sm">
+          <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-800">
+                Olá, <span className="text-primary-600">{user?.full_name?.split(' ')[0]}</span> 👋
+              </h2>
+              <p className="text-sm text-slate-500">
+                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              {/* Role Badge */}
+              <span className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                user?.role === 'admin' ? 'bg-violet-100 text-violet-700' :
+                user?.role === 'agent' ? 'bg-cyan-100 text-cyan-700' :
+                'bg-emerald-100 text-emerald-700'
+              }`}>
+                {user?.role}
+              </span>
+              
+              {/* Notification dot */}
+              <button className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors">
+                <span className="text-lg">🔔</span>
+                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Page Content */}
+        <main className="p-6">
+          <div className="animate-fade-in">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}

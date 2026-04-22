@@ -1,0 +1,11 @@
+# Memória do Agente (Log de Aprendizado e Decisões)
+
+> **ATENÇÃO AGENTES:** Este arquivo é o "cérebro de longo prazo" do projeto. Sempre que vocês tomarem uma decisão de arquitetura importante, resolverem um bug complexo ou definirem um novo padrão que não estava nas regras, vocês **DEVEM** documentar isso aqui usando a skill `atualizar-memoria.md`.
+
+## 📌 Padrões e Decisões Registradas
+
+### [2026-04-21] Estrutura de Agentes Kilo Code
+- O projeto adotou uma estrutura de agentes especialistas (`ai-engineer`, `front-end`, `back-end`) orquestrados pelo `developer` (Tech Lead).
+- **Ação futura:** Sempre que iniciar uma tarefa complexa, o orquestrador deve dividir o escopo entre os especialistas em vez de tentar resolver tudo em um único arquivo.
+
+*(Novos aprendizados devem ser adicionados abaixo desta linha)*

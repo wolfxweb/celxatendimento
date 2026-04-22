@@ -26,7 +26,7 @@ pydantic-settings==2.1.0
 # AI - LangChain & LangGraph
 langchain==0.1.17
 langchain-core==0.1.52
-langchain-community==0.0.31
+langchain-community>=0.0.36
 
 # OpenRouter (via LangChain)
 langchain-openai==0.1.6
@@ -52,3 +52,9 @@ httpx==0.26.0
 
 # Utils
 python-dotenv==1.0.1
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.4
+pytest-cov==4.1.0
+httpx==0.26.0  # For test client
