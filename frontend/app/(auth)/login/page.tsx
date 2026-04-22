@@ -18,6 +18,20 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [focusedField, setFocusedField] = useState<string | null>(null)
 
+  // Usuários de exemplo para testes
+  const sampleUsers = [
+    { email: 'superadmin@celx.com.br', password: 'admin123', role: 'Super Admin', icon: '👑', color: 'from-amber-500 to-orange-500' },
+    { email: 'admin@celx.com.br', password: 'admin123', role: 'Admin', icon: '⚡', color: 'from-violet-500 to-purple-500' },
+    { email: 'agente@celx.com.br', password: 'agente123', role: 'Atendente', icon: '👨‍💻', color: 'from-cyan-500 to-blue-500' },
+    { email: 'cliente@celx.com.br', password: 'cliente123', role: 'Cliente', icon: '👤', color: 'from-emerald-500 to-teal-500' },
+  ]
+
+  function fillCredentials(user: typeof sampleUsers[0]) {
+    setEmail(user.email)
+    setPassword(user.password)
+    setError('')
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
@@ -154,6 +168,34 @@ export default function LoginPage() {
           {/* Decorative elements */}
           <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-primary-500/20 rounded-full blur-2xl"></div>
           <div className="absolute -top-8 -left-8 w-24 h-24 bg-violet-500/20 rounded-full blur-2xl"></div>
+        </div>
+
+        {/* Usuários de Exemplo */}
+        <div className="mt-6 p-4 rounded-2xl bg-white/5 backdrop-blur-sm border border-white/10">
+          <p className="text-center text-slate-400 text-sm mb-4">👆 Clique para preencher automaticamente</p>
+          <div className="space-y-2">
+            {sampleUsers.map((user) => (
+              <button
+                key={user.email}
+                type="button"
+                onClick={() => fillCredentials(user)}
+                className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-transparent hover:border-white/10 transition-all duration-200 group"
+              >
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${user.color} flex items-center justify-center text-lg shadow-lg group-hover:scale-110 transition-transform`}>
+                  {user.icon}
+                </div>
+                <div className="flex-1 text-left">
+                  <div className="text-white font-medium text-sm">{user.role}</div>
+                  <div className="text-slate-400 text-xs font-mono">{user.email}</div>
+                </div>
+                <div className="text-slate-500 text-xs group-hover:text-slate-300 transition-colors">
+                  <span className="px-2 py-1 rounded bg-slate-800/50 text-slate-400 font-mono">
+                    {user.password}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Footer */}

@@ -7,17 +7,30 @@ INSERT INTO ai_providers (name, display_name, api_url, is_active) VALUES
 ('openrouter', 'OpenRouter', 'https://openrouter.ai/api/v1', TRUE)
 ON CONFLICT DO NOTHING;
 
--- Empresa de testes
+-- Empresa CELX Tecnologia
+INSERT INTO companies (name, domain, contact_email, status, settings) VALUES
+('CELX Tecnologia', 'celx.com.br', 'admin@celx.com.br', 'active', '{"timezone": "America/Sao_Paulo"}')
+ON CONFLICT (domain) DO NOTHING;
+
+-- Usuários CELX (company_id = 1)
+-- Senhas: admin123, agente123, cliente123
+INSERT INTO users (company_id, email, password_hash, name, role, is_active, is_email_verified) VALUES
+(1, 'admin@celx.com.br', '$2b$12$hwzMDU69r4FgHLV9MB5ge.UFqyx0tTTH81XfhnH1g6TY6j/GcrWvu', 'Administrador', 'admin', TRUE, TRUE),
+(1, 'agente@celx.com.br', '$2b$12$Ae/PPeIc0QyFolpC/iUyhOMFiUKzRKDEAztJPxlcJDCEkaLGXLgkq', 'Agente Silva', 'agent', TRUE, TRUE),
+(1, 'cliente@celx.com.br', '$2b$12$GtaUBpys0wGnffDU7CnX3.rd8pU0pse8JoHvSIby9KgoHhJbyYZrO', 'João Cliente', 'customer', TRUE, TRUE)
+ON CONFLICT (company_id, email) DO NOTHING;
+
+-- Empresa de testes (company_id = 2)
 INSERT INTO companies (name, domain, contact_email, status, settings) VALUES
 ('Empresa Teste', 'teste.com', 'admin@teste.com', 'active', '{"timezone": "America/Sao_Paulo"}')
 ON CONFLICT DO NOTHING;
 
--- Usuários da empresa teste (company_id = 1)
+-- Usuários da empresa teste (company_id = 2)
 -- Password: 123456 (hash bcrypt)
 INSERT INTO users (company_id, email, password_hash, name, role, is_active, is_email_verified) VALUES
-(1, 'admin@teste.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.FRnFJ4v0lWfIyG', 'Admin Teste', 'admin', TRUE, TRUE),
-(1, 'atendente@teste.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.FRnFJ4v0lWfIyG', 'Maria Atendente', 'agent', TRUE, TRUE),
-(1, 'cliente@teste.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.FRnFJ4v0lWfIyG', 'João Cliente', 'customer', TRUE, TRUE)
+(2, 'admin@teste.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.FRnFJ4v0lWfIyG', 'Admin Teste', 'admin', TRUE, TRUE),
+(2, 'atendente@teste.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.FRnFJ4v0lWfIyG', 'Maria Atendente', 'agent', TRUE, TRUE),
+(2, 'cliente@teste.com', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.FRnFJ4v0lWfIyG', 'João Cliente', 'customer', TRUE, TRUE)
 ON CONFLICT (company_id, email) DO NOTHING;
 
 -- Categorias padrão
