@@ -6,12 +6,6 @@
       "workingDirectory": "/home/rebeca/Documentos/carlos/celx-atendimento/celx-atendimento/mcp",
       "enabled": true,
       "timeout": 30000
-    },
-    "playwright": {
-      "type": "local",
-      "command": ["npx", "-y", "@playwright/mcp"],
-      "enabled": false,
-      "timeout": 60000
     }
   }
 }
