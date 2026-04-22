@@ -5,6 +5,26 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { isAuthenticated, getToken } from '@/lib/auth'
 
+interface NavItem {
+  href: string
+  label: string
+  icon: string
+  badge?: boolean
+  roles: string[]
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { href: '/dashboard', label: 'Dashboard', icon: '🏠', roles: ['superadmin', 'admin', 'agent', 'customer'] },
+  { href: '/dashboard/cliente/tickets', label: 'Meus Tickets', icon: '🎫', roles: ['admin', 'customer'] },
+  { href: '/dashboard/atendente/tickets', label: 'Tickets', icon: '📋', roles: ['admin', 'agent'] },
+  { href: '/dashboard/atendente/aprovacao', label: 'Aprovar IA', icon: '🤖', badge: true, roles: ['admin', 'agent'] },
+  { href: '/dashboard/admin/usuarios', label: 'Usuários', icon: '👥', roles: ['admin'] },
+  { href: '/dashboard/admin/config-ia', label: 'Config IA', icon: '⚙️', roles: ['admin'] },
+  { href: '/dashboard/admin/conhecimento', label: 'Conhecimento', icon: '📚', roles: ['admin'] },
+  { href: '/dashboard/superadmin/empresas', label: 'Empresas', icon: '🏢', roles: ['superadmin'] },
+  { href: '/dashboard/superadmin/planos', label: 'Planos', icon: '📦', roles: ['superadmin'] },
+]
+
 export default function DashboardLayout({
   children,
 }: {
@@ -48,12 +68,8 @@ export default function DashboardLayout({
     )
   }
 
-  const navItems = [
-    { href: '/dashboard', label: 'Dashboard', icon: '🏠' },
-    { href: '/dashboard/cliente/tickets', label: 'Meus Tickets', icon: '🎫' },
-    { href: '/dashboard/atendente/tickets', label: 'Tickets', icon: '📋' },
-    { href: '/dashboard/atendente/aprovacao', label: 'Aprovar IA', icon: '🤖', badge: true },
-  ]
+  // Filtrar itens do menu baseado no role do usuário
+  const navItems = NAV_ITEMS.filter(item => item.roles.includes(user?.role || ''))
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-slate-100">
@@ -154,6 +170,7 @@ export default function DashboardLayout({
             <div className="flex items-center gap-4">
               {/* Role Badge */}
               <span className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
+                user?.role === 'superadmin' ? 'bg-amber-100 text-amber-700' :
                 user?.role === 'admin' ? 'bg-violet-100 text-violet-700' :
                 user?.role === 'agent' ? 'bg-cyan-100 text-cyan-700' :
                 'bg-emerald-100 text-emerald-700'
