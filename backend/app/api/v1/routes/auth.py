@@ -32,7 +32,15 @@ async def login(
             detail="Inactive user",
         )
 
-    access_token = create_access_token(data={"sub": str(user.id)})
+    # Incluir dados do usuário no token
+    access_token = create_access_token(
+        data={
+            "sub": str(user.id),
+            "email": user.email,
+            "role": user.role,
+            "full_name": user.full_name or user.email.split("@")[0],
+        }
+    )
     return Token(access_token=access_token)
 
 

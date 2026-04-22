@@ -1,0 +1,9 @@
+{
+  "name": "celx-mcp",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "mcp": "^1.0.0",
+    "httpx": "^0.26.0"
+  }
+}
