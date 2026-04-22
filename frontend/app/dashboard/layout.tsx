@@ -49,6 +49,7 @@ export default function DashboardLayout({
   }
 
   const navItems = [
+    { href: '/dashboard', label: 'Dashboard', icon: '🏠' },
     { href: '/dashboard/cliente/tickets', label: 'Meus Tickets', icon: '🎫' },
     { href: '/dashboard/atendente/tickets', label: 'Tickets', icon: '📋' },
     { href: '/dashboard/atendente/aprovacao', label: 'Aprovar IA', icon: '🤖', badge: true },
@@ -75,9 +76,17 @@ export default function DashboardLayout({
         {/* Toggle Button */}
         <button 
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute -right-3 top-20 w-6 h-6 bg-slate-700 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-slate-600 transition-colors"
+          className="absolute -right-3 top-20 w-8 h-8 bg-gradient-to-br from-slate-700 to-slate-800 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-glow-primary hover:scale-110 transition-all duration-300 border-2 border-slate-600 hover:border-primary-500"
         >
-          {sidebarOpen ? '◀' : '▶'}
+          {sidebarOpen ? (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          )}
         </button>
 
         {/* Navigation */}
