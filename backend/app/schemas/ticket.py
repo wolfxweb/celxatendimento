@@ -155,7 +155,7 @@ class CategoryCreate(CategoryBase):
 
 class CategoryResponse(CategoryBase):
     id: int
-    company_id: uuid.UUID
+    company_id: int
     is_active: bool
     is_default: bool
     require_approval: bool

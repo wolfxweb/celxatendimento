@@ -55,7 +55,7 @@ Cada empresa configura sua própria chave de API OpenRouter no painel Admin.
 
 | Email | Senha | Role |
 |-------|-------|------|
-| superadmin@celx.com.br | 123456 | Super Admin |
+| superadmin@celx.com.br | **admin123** | Super Admin |
 | admin@teste.com | 123456 | Admin |
 | atendente@teste.com | 123456 | Atendente |
 | cliente@teste.com | 123456 | Cliente |

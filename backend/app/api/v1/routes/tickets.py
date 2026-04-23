@@ -3,7 +3,7 @@ from typing import Optional
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request
-from sqlalchemy import select, and_, or_
+from sqlalchemy import select, and_, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -145,9 +145,10 @@ async def list_tickets(
 
     # Apply filters
     if status:
-        query = query.where(Ticket.status == status)
+        # Cast status to VARCHAR for comparison with ENUM
+        query = query.where(cast(Ticket.status, String) == status)
     if assigned_to:
-        query = query.where(Ticket.assigned_to == uuid.UUID(assigned_to))
+        query = query.where(Ticket.assigned_to == int(assigned_to))
 
     query = query.order_by(Ticket.created_at.desc()).limit(limit).offset(offset)
 
