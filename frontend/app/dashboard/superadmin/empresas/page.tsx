@@ -54,7 +54,7 @@ export default function SuperAdminEmpresasPage() {
     try {
       setLoading(true)
       const params = filter ? `?status=${filter}` : ''
-      const data = await apiFetch<Company[]>(`/companies${params}`)
+      const data = await apiFetch<Company[]>(`/companies/${params}`)
       setCompanies(data)
     } catch (err) {
       setError('Erro ao carregar empresas')

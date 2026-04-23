@@ -4,7 +4,6 @@ AI Configuration Service
 Handles AI provider, model, and tool configuration per company.
 """
 
-import uuid
 from datetime import datetime
 from typing import Optional, List
 
@@ -24,7 +23,7 @@ class AIConfigService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_or_create_config(self, company_id: uuid.UUID) -> CompanyAIConfig:
+    async def get_or_create_config(self, company_id: int) -> CompanyAIConfig:
         """Get or create AI config for a company"""
         result = await self.db.execute(
             select(CompanyAIConfig).where(CompanyAIConfig.company_id == company_id)
@@ -53,7 +52,7 @@ class AIConfigService:
 
     async def update_api_key(
         self,
-        company_id: uuid.UUID,
+        company_id: int,
         api_key: str,
     ) -> dict:
         """Save and encrypt API key for a company"""
@@ -71,7 +70,7 @@ class AIConfigService:
 
         return {"status": "success", "message": "API key saved securely"}
 
-    async def test_api_key(self, company_id: uuid.UUID) -> dict:
+    async def test_api_key(self, company_id: int) -> dict:
         """Test if the API key is valid by making a test request"""
 
         config = await self.get_or_create_config(company_id)
@@ -130,7 +129,7 @@ class AIConfigService:
             for m in models
         ]
 
-    async def get_available_tools(self, company_id: uuid.UUID) -> List[dict]:
+    async def get_available_tools(self, company_id: int) -> List[dict]:
         """Get available AI tools for a company"""
 
         result = await self.db.execute(select(AITool).where(AITool.is_active == True))
@@ -156,7 +155,7 @@ class AIConfigService:
 
     async def update_config(
         self,
-        company_id: uuid.UUID,
+        company_id: int,
         llm_model: Optional[str] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
@@ -191,7 +190,7 @@ class AIConfigService:
 
         return config
 
-    async def get_full_config(self, company_id: uuid.UUID) -> dict:
+    async def get_full_config(self, company_id: int) -> dict:
         """Get full AI config including available models and tools"""
 
         config = await self.get_or_create_config(company_id)

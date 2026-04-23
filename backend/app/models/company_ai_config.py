@@ -1,7 +1,5 @@
-import uuid
-
-from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -11,8 +9,8 @@ class CompanyAIConfig(Base, TimestampMixin):
     __tablename__ = "company_ai_config"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+    company_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("companies.id"), nullable=False
     )
 
     # Provider & Credentials
@@ -26,7 +24,7 @@ class CompanyAIConfig(Base, TimestampMixin):
     llm_model: Mapped[str] = mapped_column(
         String(100), default="google/gemini-1.5-flash"
     )
-    temperature: Mapped[float] = mapped_column(String(10), default=0.7)
+    temperature: Mapped[float] = mapped_column(Float, default=0.7)
     max_tokens: Mapped[int] = mapped_column(Integer, default=2048)
 
     # Embedding Settings
@@ -39,7 +37,7 @@ class CompanyAIConfig(Base, TimestampMixin):
     system_prompt: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Tools (JSON array of tool names)
-    tools: Mapped[list] = mapped_column(Text, default=["rag"])
+    tools: Mapped[list[str]] = mapped_column(JSONB, default=lambda: ["rag"])
 
     # Autonomy
     autonomy_level: Mapped[str] = mapped_column(

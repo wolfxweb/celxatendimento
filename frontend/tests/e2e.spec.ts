@@ -1,356 +1,249 @@
-/**
- * Frontend E2E Tests with Playwright
- *
- * Run with: npx playwright test
- * Or: npx playwright test --ui for visual mode
- */
-
 import { test, expect, Page } from '@playwright/test';
 
-// Test users from seed data
 const USERS = {
-  admin: { email: 'admin@teste.com', password: '123456' },
-  customer: { email: 'cliente@teste.com', password: '123456' },
-  agent: { email: 'atendente@teste.com', password: '123456' },
+  admin: { email: 'admin@celx.com.br', password: 'admin123' },
+  customer: { email: 'cliente@celx.com.br', password: 'cliente123' },
+  agent: { email: 'agente@celx.com.br', password: 'agente123' },
   superadmin: { email: 'superadmin@celx.com.br', password: 'admin123' },
-};
+} as const;
 
-// Base URL for tests
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
+async function loginAs(page: Page, user: keyof typeof USERS) {
+  await page.goto(`${BASE_URL}/login`);
+  await page.fill('#email', USERS[user].email);
+  await page.fill('#password', USERS[user].password);
+  await page.click('button[type="submit"]');
+  await page.waitForURL('**/dashboard', { timeout: 10000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
+}
+
+function dashboardNav(page: Page) {
+  return page.locator('aside nav');
+}
+
+function navLink(page: Page, label: string) {
+  return dashboardNav(page).getByRole('link', { name: label, exact: true });
+}
+
 test.describe('Authentication', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear localStorage before each test
     await page.goto(BASE_URL);
     await page.evaluate(() => localStorage.clear());
   });
 
   test('AUTH-E2E-001: Login as Admin', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    // Use id selector since the form uses id="email" not name="email"
-    await page.fill('input#email', USERS.admin.email);
-    await page.fill('input#password', USERS.admin.password);
-    await page.click('button[type="submit"]');
-
-    // Should redirect to dashboard
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
-    await expect(page.getByRole('heading', { name: /dashboard/i }).first()).toBeVisible();
+    await loginAs(page, 'admin');
   });
 
   test('AUTH-E2E-002: Login as Customer', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.customer.email);
-    await page.fill('input#password', USERS.customer.password);
-    await page.click('button[type="submit"]');
-
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'customer');
   });
 
   test('AUTH-E2E-003: Login as Agent', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.agent.email);
-    await page.fill('input#password', USERS.agent.password);
-    await page.click('button[type="submit"]');
-
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'agent');
   });
 
   test('AUTH-E2E-004: Login as Super Admin', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.superadmin.email);
-    await page.fill('input#password', USERS.superadmin.password);
-    await page.click('button[type="submit"]');
-
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'superadmin');
   });
 
   test('AUTH-E2E-005: Login with wrong password shows error', async ({ page }) => {
     await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.admin.email);
-    await page.fill('input#password', 'wrongpassword');
+    await page.fill('#email', USERS.admin.email);
+    await page.fill('#password', 'wrongpassword');
     await page.click('button[type="submit"]');
-
-    // Should show error message
-    await expect(page.getByText(/incorretos/i).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByText('Email ou senha incorretos')).toBeVisible({ timeout: 5000 });
   });
 
   test('AUTH-E2E-006: Logout and redirect to login', async ({ page }) => {
-    // Login first
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.admin.email);
-    await page.fill('input#password', USERS.admin.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
-
-    // Click Sair button directly
-    const sairButton = page.locator('a:has-text("Sair")').first();
-    await sairButton.click();
-
-    // Should redirect to login
-    await page.waitForURL('**/login**', { timeout: 10000 });
-    await expect(page.locator('input#email').first()).toBeVisible({ timeout: 5000 });
+    await loginAs(page, 'admin');
+    await page.getByRole('link', { name: /sair/i }).click();
+    await page.waitForURL('**/login', { timeout: 10000 });
+    await expect(page.locator('#email')).toBeVisible();
   });
 });
 
 test.describe('Customer Ticket Workflow', () => {
   test.beforeEach(async ({ page }) => {
-    // Login as customer
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.customer.email);
-    await page.fill('input#password', USERS.customer.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'customer');
   });
 
   test('TICK-E2E-001: View my tickets list', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/cliente/tickets`);
-
-    await expect(page.getByRole('heading', { name: /meus tickets/i }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page).toHaveURL(/\/dashboard\/cliente\/tickets$/);
+    await expect(page.getByRole('heading', { level: 1, name: 'Meus Tickets' })).toBeVisible();
   });
 
   test('TICK-E2E-002: Filter tickets by status', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/cliente/tickets`);
-
-    // Click on status filter if available
-    const filterButton = page.locator('button:has-text("Abertos")').first();
-    if (await filterButton.isVisible()) {
-      await filterButton.click();
-    }
+    await page.getByRole('button', { name: 'Abertos', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Abertos', exact: true })).toBeVisible();
   });
 
   test('TICK-E2E-003: Navigate to create new ticket form', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/cliente/tickets/novo`);
-
-    // Should show form - look for subject input or page content
-    await expect(page.locator('text=Novo').first(), { timeout: 5000 }).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Criar Novo Ticket' })).toBeVisible();
+    await expect(page.locator('#subject')).toBeVisible();
   });
 
   test('TICK-E2E-004: Create ticket - success', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/cliente/tickets/novo`);
+    page.once('dialog', (dialog) => dialog.accept());
 
-    // Look for any input field for subject
-    const subjectInput = page.locator('input#subject, input[placeholder*="Assunto"], input[placeholder*="Subject"]').first();
-    if (await subjectInput.isVisible()) {
-      await subjectInput.fill('Test Ticket Subject E2E');
+    await page.fill('#subject', `Test Ticket Subject E2E ${Date.now()}`);
+    await page.fill('#description', 'Test ticket description for E2E test');
+    await page.click('button[type="submit"]');
 
-      // Find description textarea
-      const descInput = page.locator('textarea#description, textarea').first();
-      if (await descInput.isVisible()) {
-        await descInput.fill('Test ticket description for E2E test');
-      }
-
-      await page.click('button:has-text("Criar Ticket")');
-
-      await expect(page.getByRole('heading', { name: /criar novo ticket/i }).first()).toBeVisible({ timeout: 5000 });
-    }
+    await page.waitForURL('**/dashboard/cliente/tickets', { timeout: 10000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Meus Tickets' })).toBeVisible();
   });
 });
 
 test.describe('Agent Ticket Management', () => {
   test.beforeEach(async ({ page }) => {
-    // Login as agent
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.agent.email);
-    await page.fill('input#password', USERS.agent.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'agent');
   });
 
   test('AGT-E2E-001: View all tickets', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
-
-    await expect(page.getByRole('heading', { name: /tickets/i }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Tickets' })).toBeVisible();
   });
 
   test('AGT-E2E-002: Filter tickets by status', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
-
-    // Try filtering by status
-    const filterButton = page.locator('button:has-text("Abertos")').first();
-    if (await filterButton.isVisible()) {
-      await filterButton.click();
-    }
+    await page.getByRole('button', { name: 'Abertos', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Abertos', exact: true })).toBeVisible();
   });
 
   test('AGT-E2E-003: Open ticket detail', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
 
-    // Click on first ticket if any
-    const ticketLink = page.locator('a[href*="/dashboard/atendente/tickets/"]').first();
-    if (await ticketLink.isVisible()) {
-      await ticketLink.click();
-      await expect(page.locator('text=Detalhes').first(), { timeout: 5000 }).toBeVisible();
-    }
+    const ticketLink = page.locator('a[href*="/atendente/tickets/"], a[href*="/dashboard/atendente/tickets/"]').first();
+    await expect(ticketLink).toBeVisible({ timeout: 10000 });
+    await ticketLink.click();
+
+    await expect(page.getByText(/cliente:/i)).toBeVisible({ timeout: 10000 });
   });
 
   test('AGT-E2E-005: Send customer message', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
 
-    // Navigate to first ticket
-    const ticketLink = page.locator('a[href*="/dashboard/atendente/tickets/"]').first();
-    if (await ticketLink.isVisible()) {
-      await ticketLink.click();
+    const ticketLink = page.locator('a[href*="/atendente/tickets/"], a[href*="/dashboard/atendente/tickets/"]').first();
+    await expect(ticketLink).toBeVisible({ timeout: 10000 });
+    await ticketLink.click();
 
-      // Type message
-      const messageInput = page.locator('textarea#content, textarea').first();
-      if (await messageInput.isVisible()) {
-        await messageInput.fill('Test message from agent E2E');
-        await page.click('button:has-text("Enviar"), button:has-text("Responder")');
-      }
-    }
+    const messageInput = page.locator('textarea').first();
+    await expect(messageInput).toBeVisible({ timeout: 10000 });
+    await messageInput.fill('Test message from agent E2E');
+    await page.getByRole('button', { name: /enviar|responder/i }).click();
   });
 });
 
 test.describe('AI Approval Page', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.agent.email);
-    await page.fill('input#password', USERS.agent.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'agent');
   });
 
   test('AI-E2E-001: View pending AI approvals', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/atendente/aprovacao`);
-
-    // Should show AI approval interface - use .first() since "Aprovar" may appear multiple times
-    await expect(page.locator('text=Aprovar').first(), { timeout: 5000 }).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: /aprova/i })).toBeVisible({ timeout: 5000 });
   });
 });
 
 test.describe('Admin User Management', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.admin.email);
-    await page.fill('input#password', USERS.admin.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'admin');
   });
 
   test('USER-E2E-001: View user list', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/admin/usuarios`);
-
-    await expect(page.getByRole('heading', { name: /usuário/i }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Gerenciar Usuários' })).toBeVisible();
   });
 });
 
 test.describe('Admin AI Configuration', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.admin.email);
-    await page.fill('input#password', USERS.admin.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'admin');
   });
 
   test('AICFG-E2E-001: View AI configuration', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/admin/config-ia`);
-
-    await expect(page.locator('text=Config').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Configuração da IA' })).toBeVisible();
   });
 
   test('AICFG-E2E-006: Edit system prompt', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/admin/config-ia/prompt-editor`);
-
-    await expect(page.getByRole('heading', { name: /prompt/i }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Editor de Prompt' })).toBeVisible();
   });
 });
 
 test.describe('Admin Knowledge Base', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.admin.email);
-    await page.fill('input#password', USERS.admin.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'admin');
   });
 
   test('KB-E2E-001: View knowledge articles', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/admin/conhecimento`);
-
-    await expect(page.getByRole('heading', { name: /conhecimento/i }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Base de Conhecimento' })).toBeVisible();
   });
 });
 
 test.describe('Superadmin Company Management', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.superadmin.email);
-    await page.fill('input#password', USERS.superadmin.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'superadmin');
   });
 
   test('COMP-E2E-001: View companies list', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/superadmin/empresas`);
-
-    await expect(page.getByRole('heading', { name: /empresa/i }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Gerenciar Empresas' })).toBeVisible();
   });
 });
 
 test.describe('Superadmin Plan Management', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.superadmin.email);
-    await page.fill('input#password', USERS.superadmin.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
+    await loginAs(page, 'superadmin');
   });
 
   test('PLAN-E2E-001: View plans list', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/superadmin/planos`);
-
-    await expect(page.getByRole('heading', { name: /plano/i }).first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Planos de Assinatura' })).toBeVisible();
   });
 });
 
 test.describe('Dashboard Access Control', () => {
   test('DASH-E2E-001: Superadmin sees Empresas and Planos', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.superadmin.email);
-    await page.fill('input#password', USERS.superadmin.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
-
-    // Should see superadmin menu items - use role selector for navigation links
-    await expect(page.getByRole('link', { name: /empresas/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /planos/i })).toBeVisible();
+    await loginAs(page, 'superadmin');
+    await expect(navLink(page, 'Empresas')).toBeVisible();
+    await expect(navLink(page, 'Planos')).toBeVisible();
   });
 
   test('DASH-E2E-002: Admin sees full menu', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.admin.email);
-    await page.fill('input#password', USERS.admin.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
-
-    // Should see admin menu items - use role selector for navigation link
-    await expect(page.getByRole('link', { name: /usuários/i })).toBeVisible();
+    await loginAs(page, 'admin');
+    await expect(navLink(page, 'Meus Tickets')).toBeVisible();
+    await expect(navLink(page, 'Tickets')).toBeVisible();
+    await expect(navLink(page, 'Aprovar IA')).toBeVisible();
+    await expect(navLink(page, 'Usuários')).toBeVisible();
+    await expect(navLink(page, 'Config IA')).toBeVisible();
+    await expect(navLink(page, 'Conhecimento')).toBeVisible();
   });
 
   test('DASH-E2E-003: Agent sees Tickets and Aprovar IA', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.agent.email);
-    await page.fill('input#password', USERS.agent.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
-
-    await expect(page.getByRole('link', { name: /tickets/i }).first()).toBeVisible();
+    await loginAs(page, 'agent');
+    await expect(navLink(page, 'Tickets')).toBeVisible();
+    await expect(navLink(page, 'Aprovar IA')).toBeVisible();
+    await expect(navLink(page, 'Usuários')).toHaveCount(0);
   });
 
   test('DASH-E2E-004: Customer sees only Meus Tickets', async ({ page }) => {
-    await page.goto(`${BASE_URL}/login`);
-    await page.fill('input#email', USERS.customer.email);
-    await page.fill('input#password', USERS.customer.password);
-    await page.click('button[type="submit"]');
-    await page.waitForURL('**/dashboard**', { timeout: 10000 });
-
-    await expect(page.getByRole('link', { name: /meus tickets/i }).first()).toBeVisible();
+    await loginAs(page, 'customer');
+    await expect(navLink(page, 'Meus Tickets')).toBeVisible();
+    await expect(navLink(page, 'Tickets')).toHaveCount(0);
+    await expect(navLink(page, 'Aprovar IA')).toHaveCount(0);
   });
 });
 
-// Health check test
 test('Health Check: API is running', async ({ page }) => {
   const response = await page.request.get(`${API_URL}/health`);
   expect(response.ok()).toBeTruthy();

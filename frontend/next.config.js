@@ -1,4 +1,6 @@
 /** @type {import('next').NextConfig} */
+const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
 const nextConfig = {
   reactStrictMode: true,
   
@@ -9,8 +11,16 @@ const nextConfig = {
   async rewrites() {
     return [
       {
+        source: '/api/v1/companies',
+        destination: `${apiUrl}/api/v1/companies/`,
+      },
+      {
+        source: '/api/v1/plans',
+        destination: `${apiUrl}/api/v1/plans/`,
+      },
+      {
         source: '/api/v1/:path*',
-        destination: 'http://backend:8000/api/v1/:path*',
+        destination: `${apiUrl}/api/v1/:path*`,
       },
     ]
   },

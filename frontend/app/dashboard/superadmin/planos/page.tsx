@@ -43,7 +43,7 @@ export default function SuperAdminPlanosPage() {
   async function loadPlans() {
     try {
       setLoading(true)
-      const data = await apiFetch<Plan[]>('/plans')
+      const data = await apiFetch<Plan[]>('/plans/')
       setPlans(data)
     } catch (err) {
       setError('Erro ao carregar planos')
@@ -70,7 +70,7 @@ export default function SuperAdminPlanosPage() {
       if (editingPlan) {
         await apiPut(`/plans/${editingPlan.id}`, planData)
       } else {
-        await apiPost('/plans', planData)
+        await apiPost('/plans/', planData)
       }
 
       setShowModal(false)
