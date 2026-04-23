@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, APIRequestContext } from '@playwright/test';
 
 const USERS = {
   admin: { email: 'admin@celx.com.br', password: 'admin123' },
@@ -15,7 +15,7 @@ async function loginAs(page: Page, user: keyof typeof USERS) {
   await page.fill('#email', USERS[user].email);
   await page.fill('#password', USERS[user].password);
   await page.click('button[type="submit"]');
-  await page.waitForURL('**/dashboard', { timeout: 10000 });
+  await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
   await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
 }
 
@@ -24,7 +24,35 @@ function dashboardNav(page: Page) {
 }
 
 function navLink(page: Page, label: string) {
-  return dashboardNav(page).getByRole('link', { name: label, exact: true });
+  return dashboardNav(page).getByRole('link', { name: new RegExp(label, 'i') });
+}
+
+async function apiLogin(request: APIRequestContext, user: keyof typeof USERS) {
+  const response = await request.post(`${API_URL}/api/v1/auth/login`, {
+    data: USERS[user],
+  });
+
+  expect(response.ok()).toBeTruthy();
+  const data = await response.json();
+
+  return data.access_token as string;
+}
+
+async function createTicketViaApi(request: APIRequestContext) {
+  const token = await apiLogin(request, 'customer');
+  const response = await request.post(`${API_URL}/api/v1/tickets/`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    data: {
+      subject: `Ticket E2E ${Date.now()}`,
+      description: 'Ticket criado automaticamente para cenarios do atendente.',
+      priority: 'medium',
+      category_id: null,
+    },
+  });
+
+  expect(response.ok()).toBeTruthy();
 }
 
 test.describe('Authentication', () => {
@@ -78,8 +106,8 @@ test.describe('Customer Ticket Workflow', () => {
 
   test('TICK-E2E-002: Filter tickets by status', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/cliente/tickets`);
-    await page.getByRole('button', { name: 'Abertos', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Abertos', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /abertos/i }).click();
+    await expect(page.getByRole('button', { name: /abertos/i })).toBeVisible();
   });
 
   test('TICK-E2E-003: Navigate to create new ticket form', async ({ page }) => {
@@ -102,7 +130,8 @@ test.describe('Customer Ticket Workflow', () => {
 });
 
 test.describe('Agent Ticket Management', () => {
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page, request }) => {
+    await createTicketViaApi(request);
     await loginAs(page, 'agent');
   });
 
@@ -113,8 +142,8 @@ test.describe('Agent Ticket Management', () => {
 
   test('AGT-E2E-002: Filter tickets by status', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
-    await page.getByRole('button', { name: 'Abertos', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Abertos', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: /abertos/i }).click();
+    await expect(page.getByRole('button', { name: /abertos/i })).toBeVisible();
   });
 
   test('AGT-E2E-003: Open ticket detail', async ({ page }) => {
@@ -148,7 +177,7 @@ test.describe('AI Approval Page', () => {
 
   test('AI-E2E-001: View pending AI approvals', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/atendente/aprovacao`);
-    await expect(page.getByRole('heading', { level: 1, name: /aprova/i })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { level: 1, name: 'Aprovação de IA' })).toBeVisible({ timeout: 5000 });
   });
 });
 

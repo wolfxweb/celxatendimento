@@ -1,8 +1,7 @@
-import uuid
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, IPvAnyAddress
 
 
 class TicketBase(BaseModel):
@@ -22,16 +21,16 @@ class TicketUpdate(BaseModel):
     status: Optional[str] = None
     priority: Optional[str] = None
     category_id: Optional[int] = None
-    assigned_to: Optional[uuid.UUID] = None
+    assigned_to: Optional[int] = None
 
 
 class TicketResponse(TicketBase):
-    id: uuid.UUID
+    id: int
     ticket_number: str
     status: str
-    company_id: uuid.UUID
-    user_id: uuid.UUID
-    assigned_to: Optional[uuid.UUID] = None
+    company_id: int
+    user_id: int
+    assigned_to: Optional[int] = None
 
     # Timestamps
     first_response_at: Optional[datetime] = None
@@ -49,7 +48,7 @@ class TicketResponse(TicketBase):
 
     # Metadata
     channel: str = "website"
-    ip_address: Optional[str] = None
+    ip_address: Optional[IPvAnyAddress] = None
     user_agent: Optional[str] = None
 
     created_at: datetime
@@ -60,7 +59,7 @@ class TicketResponse(TicketBase):
 
 
 class TicketListResponse(BaseModel):
-    id: uuid.UUID
+    id: int
     ticket_number: str
     subject: str
     status: str
@@ -83,8 +82,8 @@ class MessageCreate(MessageBase):
 
 class MessageResponse(MessageBase):
     id: int
-    ticket_id: uuid.UUID
-    author_id: Optional[uuid.UUID] = None
+    ticket_id: int
+    author_id: Optional[int] = None
     author_name: Optional[str] = None
     author_role: Optional[str] = None
     message_type: str
@@ -130,7 +129,7 @@ class AIResponseEdit(BaseModel):
 
 
 class TicketAssignmentRequest(BaseModel):
-    assigned_to: uuid.UUID
+    assigned_to: int
     reason: str = "manual"
     notes: Optional[str] = None
 

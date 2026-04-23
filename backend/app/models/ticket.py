@@ -1,8 +1,7 @@
-import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy.dialects.postgresql import INET, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -34,8 +33,34 @@ class Ticket(Base, TimestampMixin):
     )
 
     # Status and Priority
-    status: Mapped[str] = mapped_column(String(50), default="open", nullable=False)
-    priority: Mapped[str] = mapped_column(String(50), default="medium", nullable=False)
+    status: Mapped[str] = mapped_column(
+        Enum(
+            "open",
+            "pending_ai",
+            "pending_agent",
+            "resolved",
+            "closed",
+            "rejected",
+            name="ticket_status",
+            native_enum=True,
+            create_type=False,
+        ),
+        default="open",
+        nullable=False,
+    )
+    priority: Mapped[str] = mapped_column(
+        Enum(
+            "critical",
+            "high",
+            "medium",
+            "low",
+            name="ticket_priority",
+            native_enum=True,
+            create_type=False,
+        ),
+        default="medium",
+        nullable=False,
+    )
 
     # Content
     subject: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -80,7 +105,7 @@ class Ticket(Base, TimestampMixin):
     extra_data_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
 
     # IP Address and User Agent
-    ip_address: Mapped[str] = mapped_column(String(50), nullable=True)
+    ip_address: Mapped[str] = mapped_column(INET, nullable=True)
     user_agent: Mapped[str] = mapped_column(Text, nullable=True)
 
     # Soft delete
