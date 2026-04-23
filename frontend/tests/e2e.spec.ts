@@ -35,8 +35,7 @@ test.describe('Authentication', () => {
 
     // Should redirect to dashboard
     await page.waitForURL('**/dashboard**', { timeout: 10000 });
-    // Use .first() because Dashboard text appears in menu AND page title
-    await expect(page.locator('text=Dashboard').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /dashboard/i }).first()).toBeVisible();
   });
 
   test('AUTH-E2E-002: Login as Customer', async ({ page }) => {
@@ -84,33 +83,13 @@ test.describe('Authentication', () => {
     await page.click('button[type="submit"]');
     await page.waitForURL('**/dashboard**', { timeout: 10000 });
 
-    // Logout - click on user menu first, then look for Sair button
-    // Try to find a user dropdown/menu trigger (often an avatar or user name)
-    const userMenuTrigger = page.locator('button[aria-label*="Perfil"], button[aria-label*="User"], button:has-text("admin")').first();
-    if (await userMenuTrigger.isVisible()) {
-      await userMenuTrigger.click();
-      // Wait a bit for menu to open
-      await page.waitForTimeout(500);
-    }
+    // Click Sair button directly
+    const sairButton = page.locator('a:has-text("Sair")').first();
+    await sairButton.click();
 
-    // Now try to find and click logout button
-    const logoutButton = page.getByRole('button', { name: /sair/i }).first();
-    if (await logoutButton.isVisible()) {
-      await logoutButton.click();
-    } else {
-      // Alternative: try clicking a link with href to /login or logout
-      const altLogout = page.locator('a[href="/login"], a:has-text("Sair")').first();
-      if (await altLogout.isVisible()) {
-        await altLogout.click();
-      }
-    }
-
-    // Should redirect to login - use waitForLoadState instead of precise URL matching
-    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {
-      // If networkidle fails, just wait for URL to contain login
-    });
-    // Verify we're back at login page
-    await expect(page.locator('input#email, input[name="email"]').first()).toBeVisible({ timeout: 5000 });
+    // Should redirect to login
+    await page.waitForURL('**/login**', { timeout: 10000 });
+    await expect(page.locator('input#email').first()).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -127,7 +106,7 @@ test.describe('Customer Ticket Workflow', () => {
   test('TICK-E2E-001: View my tickets list', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/cliente/tickets`);
 
-    await expect(page.locator('h1:has-text("Meus Tickets")').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /meus tickets/i }).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('TICK-E2E-002: Filter tickets by status', async ({ page }) => {
@@ -163,7 +142,7 @@ test.describe('Customer Ticket Workflow', () => {
 
       await page.click('button:has-text("Criar Ticket")');
 
-      await expect(page.locator('h1:has-text("Criar Novo Ticket")').first()).toBeVisible({ timeout: 5000 });
+      await expect(page.getByRole('heading', { name: /criar novo ticket/i }).first()).toBeVisible({ timeout: 5000 });
     }
   });
 });
@@ -181,7 +160,7 @@ test.describe('Agent Ticket Management', () => {
   test('AGT-E2E-001: View all tickets', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
 
-    await expect(page.locator('h1:has-text("Tickets")').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /tickets/i }).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('AGT-E2E-002: Filter tickets by status', async ({ page }) => {
@@ -252,7 +231,7 @@ test.describe('Admin User Management', () => {
   test('USER-E2E-001: View user list', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/admin/usuarios`);
 
-    await expect(page.locator('h1:has-text("Gerenciar Usuários")').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /usuário/i }).first()).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -274,8 +253,7 @@ test.describe('Admin AI Configuration', () => {
   test('AICFG-E2E-006: Edit system prompt', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/admin/config-ia/prompt-editor`);
 
-    // Use heading selector instead of generic "Prompt" text
-    await expect(page.locator('h2:has-text("Prompt"), h1:has-text("Prompt"), h3:has-text("Prompt")').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /prompt/i }).first()).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -291,8 +269,7 @@ test.describe('Admin Knowledge Base', () => {
   test('KB-E2E-001: View knowledge articles', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/admin/conhecimento`);
 
-    // Use heading selector for more specific matching
-    await expect(page.locator('h2:has-text("Conhecimento"), h1:has-text("Conhecimento")').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /conhecimento/i }).first()).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -308,8 +285,7 @@ test.describe('Superadmin Company Management', () => {
   test('COMP-E2E-001: View companies list', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/superadmin/empresas`);
 
-    // Use heading selector for more specific matching
-    await expect(page.locator('h2:has-text("Empresas"), h1:has-text("Empresas")').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /empresa/i }).first()).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -325,8 +301,7 @@ test.describe('Superadmin Plan Management', () => {
   test('PLAN-E2E-001: View plans list', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/superadmin/planos`);
 
-    // Use heading selector for more specific matching
-    await expect(page.locator('h2:has-text("Planos"), h1:has-text("Planos")').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: /plano/i }).first()).toBeVisible({ timeout: 5000 });
   });
 });
 
