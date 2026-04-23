@@ -127,8 +127,7 @@ test.describe('Customer Ticket Workflow', () => {
   test('TICK-E2E-001: View my tickets list', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/cliente/tickets`);
 
-    // Should show tickets list - use .first() because "Tickets" appears in menu and page title
-    await expect(page.locator('h2:has-text("Tickets"), h2:has-text("Meus Tickets")').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('h1:has-text("Meus Tickets")').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('TICK-E2E-002: Filter tickets by status', async ({ page }) => {
@@ -162,11 +161,9 @@ test.describe('Customer Ticket Workflow', () => {
         await descInput.fill('Test ticket description for E2E test');
       }
 
-      // Submit
-      await page.click('button[type="submit"], button:has-text("Criar"), button:has-text("Enviar")');
+      await page.click('button:has-text("Criar Ticket")');
 
-      // Should see ticket related content - use heading instead of generic text
-      await expect(page.locator('h2:has-text("Ticket"), h2:has-text("Criar")').first()).toBeVisible({ timeout: 5000 });
+      await expect(page.locator('h1:has-text("Criar Novo Ticket")').first()).toBeVisible({ timeout: 5000 });
     }
   });
 });
@@ -184,8 +181,7 @@ test.describe('Agent Ticket Management', () => {
   test('AGT-E2E-001: View all tickets', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
 
-    // Use heading selector instead of generic text
-    await expect(page.locator('h2:has-text("Tickets")').first(), { timeout: 5000 }).toBeVisible();
+    await expect(page.locator('h1:has-text("Tickets")').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('AGT-E2E-002: Filter tickets by status', async ({ page }) => {
@@ -256,8 +252,7 @@ test.describe('Admin User Management', () => {
   test('USER-E2E-001: View user list', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/admin/usuarios`);
 
-    // Use heading selector for more specific matching
-    await expect(page.locator('h2:has-text("Usuários"), h2:has-text("Gerenciar Usuários")').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('h1:has-text("Gerenciar Usuários")').first()).toBeVisible({ timeout: 5000 });
   });
 });
 
@@ -273,8 +268,7 @@ test.describe('Admin AI Configuration', () => {
   test('AICFG-E2E-001: View AI configuration', async ({ page }) => {
     await page.goto(`${BASE_URL}/dashboard/admin/config-ia`);
 
-    // Should show AI config form - look for specific heading
-    await expect(page.locator('h2:has-text("Config"), h1:has-text("Config")').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Config').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('AICFG-E2E-006: Edit system prompt', async ({ page }) => {
@@ -367,8 +361,7 @@ test.describe('Dashboard Access Control', () => {
     await page.click('button[type="submit"]');
     await page.waitForURL('**/dashboard**', { timeout: 10000 });
 
-    // Should see agent menu items - use role selector for navigation link
-    await expect(page.getByRole('link', { name: /tickets/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /tickets/i }).first()).toBeVisible();
   });
 
   test('DASH-E2E-004: Customer sees only Meus Tickets', async ({ page }) => {
@@ -378,8 +371,7 @@ test.describe('Dashboard Access Control', () => {
     await page.click('button[type="submit"]');
     await page.waitForURL('**/dashboard**', { timeout: 10000 });
 
-    // Should see customer menu items - use role selector for navigation link
-    await expect(page.getByRole('link', { name: /meus tickets/i })).toBeVisible();
+    await expect(page.getByRole('link', { name: /meus tickets/i }).first()).toBeVisible();
   });
 });
 

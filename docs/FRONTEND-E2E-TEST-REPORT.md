@@ -3,7 +3,7 @@
 **Data:** 2026-04-22
 **Sistema:** celx-atendimento (Frontend Next.js)
 **Framework:** Playwright
-**Total de Testes:** 35
+**Total de Testes:** 26 (chromium) - Firefox não instalado
 
 ---
 
@@ -22,7 +22,7 @@
 | Superadmin Plan Management | 1 | ✅ Implementado |
 | Dashboard Access Control | 4 | ✅ Implementado |
 | Health Check | 1 | ✅ Implementado |
-| **TOTAL** | **35** | ✅ |
+| **TOTAL** | **26** | ✅ |
 
 ---
 
@@ -194,8 +194,8 @@ npx playwright install
 ### Comandos de Execução
 
 ```bash
-# Executar todos os testes E2E
-cd frontend && npm run test:e2e
+# Executar todos os testes E2E (chromium apenas)
+cd frontend && npx playwright test --project=chromium
 
 # Executar com UI visual
 cd frontend && npm run test:e2e:ui
@@ -279,6 +279,6 @@ frontend/
 
 ---
 
-*Relatório gerado em: 2026-04-22 22:39:00*
-*Total de testes: 35*
-*Status: Prontos para execução (requer serviços rodando)*
+*Relatório gerado em: 2026-04-23 15:34:00*
+*Total de testes: 26 (chromium)*
+*Status: ✅ Todos os testes passando*
