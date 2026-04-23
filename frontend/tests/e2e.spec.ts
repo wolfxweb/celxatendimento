@@ -72,7 +72,7 @@ test.describe('Authentication', () => {
     await page.click('button[type="submit"]');
 
     // Should show error message
-    await expect(page.locator('text=incorretos'), { timeout: 5000 }).toBeVisible();
+    await expect(page.getByText(/incorretos/i).first()).toBeVisible({ timeout: 5000 });
   });
 
   test('AUTH-E2E-006: Logout and redirect to login', async ({ page }) => {
