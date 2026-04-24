@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Dashboard Access Control >> DASH-E2E-002: Admin sees full menu
-- Location: frontend/tests/e2e.spec.ts:251:7
+- Location: tests/e2e.spec.ts:251:7
 
 # Error details
 

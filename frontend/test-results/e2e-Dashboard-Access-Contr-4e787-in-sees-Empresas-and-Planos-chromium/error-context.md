@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Dashboard Access Control >> DASH-E2E-001: Superadmin sees Empresas and Planos
-- Location: frontend/tests/e2e.spec.ts:245:7
+- Location: tests/e2e.spec.ts:245:7
 
 # Error details
 

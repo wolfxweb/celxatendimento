@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Authentication >> AUTH-E2E-003: Login as Agent
-- Location: frontend/tests/e2e.spec.ts:72:7
+- Location: tests/e2e.spec.ts:72:7
 
 # Error details
 

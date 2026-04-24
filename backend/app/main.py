@@ -20,6 +20,7 @@ app = FastAPI(
     title="celx-atendimento",
     version="1.0.0",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 app.include_router(api_router)

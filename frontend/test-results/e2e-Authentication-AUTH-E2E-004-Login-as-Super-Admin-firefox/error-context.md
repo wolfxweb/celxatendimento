@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Authentication >> AUTH-E2E-004: Login as Super Admin
-- Location: frontend/tests/e2e.spec.ts:76:7
+- Location: tests/e2e.spec.ts:76:7
 
 # Error details
 
@@ -21,7 +21,7 @@ waiting for navigation until "load"
 # Page snapshot
 
 ```yaml
-- generic [active] [ref=e1]:
+- generic [ref=e1]:
   - generic [ref=e8]:
     - generic [ref=e9]:
       - generic [ref=e11]: C
@@ -39,7 +39,7 @@ waiting for navigation until "load"
         - textbox "Senha" [ref=e22]:
           - /placeholder: ••••••••
           - text: admin123
-      - button "Entrar →" [ref=e23] [cursor=pointer]:
+      - button "Entrar →" [active] [ref=e23] [cursor=pointer]:
         - generic [ref=e25]:
           - text: Entrar
           - generic [ref=e26]: →

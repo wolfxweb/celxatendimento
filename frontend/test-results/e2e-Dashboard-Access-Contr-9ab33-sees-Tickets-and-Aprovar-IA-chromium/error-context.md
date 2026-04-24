@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Dashboard Access Control >> DASH-E2E-003: Agent sees Tickets and Aprovar IA
-- Location: frontend/tests/e2e.spec.ts:261:7
+- Location: tests/e2e.spec.ts:261:7
 
 # Error details
 

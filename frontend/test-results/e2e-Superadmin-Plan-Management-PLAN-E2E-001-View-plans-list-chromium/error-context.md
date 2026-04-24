@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Superadmin Plan Management >> PLAN-E2E-001: View plans list
-- Location: frontend/tests/e2e.spec.ts:238:7
+- Location: tests/e2e.spec.ts:238:7
 
 # Error details
 

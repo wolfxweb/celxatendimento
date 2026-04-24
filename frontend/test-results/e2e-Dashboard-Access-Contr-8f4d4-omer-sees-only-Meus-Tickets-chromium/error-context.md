@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Dashboard Access Control >> DASH-E2E-004: Customer sees only Meus Tickets
-- Location: frontend/tests/e2e.spec.ts:268:7
+- Location: tests/e2e.spec.ts:268:7
 
 # Error details
 

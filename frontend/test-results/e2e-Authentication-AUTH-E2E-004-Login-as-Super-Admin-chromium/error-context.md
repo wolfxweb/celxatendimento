@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Authentication >> AUTH-E2E-004: Login as Super Admin
-- Location: frontend/tests/e2e.spec.ts:76:7
+- Location: tests/e2e.spec.ts:76:7
 
 # Error details
 

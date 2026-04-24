@@ -160,7 +160,7 @@ export default function AtendenteTicketsPage() {
                   >
                     <td className="px-6 py-4">
                       <Link
-                        href={`/atendente/tickets/${ticket.id}`}
+                        href={`/dashboard/atendente/tickets/${ticket.id}`}
                         className="font-semibold text-primary-600 hover:text-primary-700 transition-colors relative"
                       >
                         <span className="relative z-10">{ticket.ticket_number}</span>
@@ -169,7 +169,7 @@ export default function AtendenteTicketsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <Link
-                        href={`/atendente/tickets/${ticket.id}`}
+                        href={`/dashboard/atendente/tickets/${ticket.id}`}
                         className="text-slate-700 hover:text-primary-600 transition-colors font-medium"
                       >
                         {ticket.subject}

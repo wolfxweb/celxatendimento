@@ -23,6 +23,8 @@ services:
       - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
     networks:
       - celx-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d celx_atendimento"]
       interval: 10s
@@ -93,7 +95,7 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-sua-chave-32-bytes-aqui12345}
       OPENROUTER_API_URL: https://openrouter.ai/api/v1
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      NEXT_PUBLIC_API_URL: http://backend:8000
+      NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     ports:
       - "${BACKEND_PORT:-8000}:8000"
@@ -101,6 +103,8 @@ services:
       - uploads_data:/app/uploads
     networks:
       - celx-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -145,6 +149,8 @@ services:
       - uploads_data:/app/uploads
     networks:
       - celx-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       postgres:
         condition: service_healthy
@@ -165,17 +171,19 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://backend:8000
+        NEXT_PUBLIC_API_URL: http://host.docker.internal:8000
     container_name: celx-frontend
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: http://backend:8000
+      NEXT_PUBLIC_API_URL: http://host.docker.internal:8000
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     networks:
       - celx-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       backend:
         condition: service_healthy

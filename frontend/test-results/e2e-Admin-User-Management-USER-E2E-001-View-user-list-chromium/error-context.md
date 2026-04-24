@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Admin User Management >> USER-E2E-001: View user list
-- Location: frontend/tests/e2e.spec.ts:189:7
+- Location: tests/e2e.spec.ts:189:7
 
 # Error details
 

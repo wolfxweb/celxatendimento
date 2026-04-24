@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Customer Ticket Workflow >> TICK-E2E-003: Navigate to create new ticket form
-- Location: frontend/tests/e2e.spec.ts:113:7
+- Location: tests/e2e.spec.ts:113:7
 
 # Error details
 

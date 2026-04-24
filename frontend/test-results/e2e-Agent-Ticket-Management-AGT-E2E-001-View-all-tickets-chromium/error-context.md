@@ -7,14 +7,71 @@
 # Test info
 
 - Name: e2e.spec.ts >> Agent Ticket Management >> AGT-E2E-001: View all tickets
-- Location: frontend/tests/e2e.spec.ts:138:7
+- Location: tests/e2e.spec.ts:138:7
 
 # Error details
 
 ```
-Error: expect(received).toBeTruthy()
+TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+=========================== logs ===========================
+waiting for navigation until "load"
+============================================================
+```
 
-Received: false
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e11]: C
+      - heading "celx-atendimento" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Sistema de tickets com IA
+    - generic [ref=e15]:
+      - generic [ref=e16]: Email ou senha incorretos
+      - generic [ref=e17]:
+        - text: Email
+        - textbox "Email" [ref=e19]:
+          - /placeholder: seu@email.com
+          - text: agente@celx.com.br
+      - generic [ref=e20]:
+        - text: Senha
+        - textbox "Senha" [ref=e22]:
+          - /placeholder: ••••••••
+          - text: agente123
+      - button "Entrar →" [ref=e23] [cursor=pointer]:
+        - generic [ref=e25]:
+          - text: Entrar
+          - generic [ref=e26]: →
+    - generic [ref=e29]:
+      - paragraph [ref=e30]: 👆 Clique para preencher automaticamente
+      - generic [ref=e31]:
+        - button "👑 Super Admin superadmin@celx.com.br admin123" [ref=e32] [cursor=pointer]:
+          - generic [ref=e33]: 👑
+          - generic [ref=e34]:
+            - generic [ref=e35]: Super Admin
+            - generic [ref=e36]: superadmin@celx.com.br
+          - generic [ref=e37]: admin123
+        - button "⚡ Admin admin@celx.com.br admin123" [ref=e38] [cursor=pointer]:
+          - generic [ref=e39]: ⚡
+          - generic [ref=e40]:
+            - generic [ref=e41]: Admin
+            - generic [ref=e42]: admin@celx.com.br
+          - generic [ref=e43]: admin123
+        - button "👨‍💻 Atendente agente@celx.com.br agente123" [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: 👨‍💻
+          - generic [ref=e46]:
+            - generic [ref=e47]: Atendente
+            - generic [ref=e48]: agente@celx.com.br
+          - generic [ref=e49]: agente123
+        - button "👤 Cliente cliente@celx.com.br cliente123" [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]: 👤
+          - generic [ref=e52]:
+            - generic [ref=e53]: Cliente
+            - generic [ref=e54]: cliente@celx.com.br
+          - generic [ref=e55]: cliente123
+    - paragraph [ref=e56]: Sistema de atendimento com inteligência artificial
+  - alert [ref=e57]
 ```
 
 # Test source
@@ -37,7 +94,8 @@ Received: false
   15  |   await page.fill('#email', USERS[user].email);
   16  |   await page.fill('#password', USERS[user].password);
   17  |   await page.click('button[type="submit"]');
-  18  |   await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
+> 18  |   await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
+      |              ^ TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
   19  |   await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
   20  | }
   21  | 
@@ -74,8 +132,7 @@ Received: false
   52  |     },
   53  |   });
   54  | 
-> 55  |   expect(response.ok()).toBeTruthy();
-      |                         ^ Error: expect(received).toBeTruthy()
+  55  |   expect(response.ok()).toBeTruthy();
   56  | }
   57  | 
   58  | test.describe('Authentication', () => {
@@ -139,41 +196,4 @@ Received: false
   116 |     await expect(page.locator('#subject')).toBeVisible();
   117 |   });
   118 | 
-  119 |   test('TICK-E2E-004: Create ticket - success', async ({ page }) => {
-  120 |     await page.goto(`${BASE_URL}/dashboard/cliente/tickets/novo`);
-  121 |     page.once('dialog', (dialog) => dialog.accept());
-  122 | 
-  123 |     await page.fill('#subject', `Test Ticket Subject E2E ${Date.now()}`);
-  124 |     await page.fill('#description', 'Test ticket description for E2E test');
-  125 |     await page.click('button[type="submit"]');
-  126 | 
-  127 |     await page.waitForURL('**/dashboard/cliente/tickets', { timeout: 10000 });
-  128 |     await expect(page.getByRole('heading', { level: 1, name: 'Meus Tickets' })).toBeVisible();
-  129 |   });
-  130 | });
-  131 | 
-  132 | test.describe('Agent Ticket Management', () => {
-  133 |   test.beforeEach(async ({ page, request }) => {
-  134 |     await createTicketViaApi(request);
-  135 |     await loginAs(page, 'agent');
-  136 |   });
-  137 | 
-  138 |   test('AGT-E2E-001: View all tickets', async ({ page }) => {
-  139 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
-  140 |     await expect(page.getByRole('heading', { level: 1, name: 'Tickets' })).toBeVisible();
-  141 |   });
-  142 | 
-  143 |   test('AGT-E2E-002: Filter tickets by status', async ({ page }) => {
-  144 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
-  145 |     await page.getByRole('button', { name: /abertos/i }).click();
-  146 |     await expect(page.getByRole('button', { name: /abertos/i })).toBeVisible();
-  147 |   });
-  148 | 
-  149 |   test('AGT-E2E-003: Open ticket detail', async ({ page }) => {
-  150 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
-  151 | 
-  152 |     const ticketLink = page.locator('a[href*="/atendente/tickets/"], a[href*="/dashboard/atendente/tickets/"]').first();
-  153 |     await expect(ticketLink).toBeVisible({ timeout: 10000 });
-  154 |     await ticketLink.click();
-  155 | 
 ```

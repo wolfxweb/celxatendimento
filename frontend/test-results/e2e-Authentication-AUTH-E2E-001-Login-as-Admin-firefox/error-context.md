@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Authentication >> AUTH-E2E-001: Login as Admin
-- Location: frontend/tests/e2e.spec.ts:64:7
+- Location: tests/e2e.spec.ts:64:7
 
 # Error details
 

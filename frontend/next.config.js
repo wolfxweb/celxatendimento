@@ -3,35 +3,30 @@ const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 const nextConfig = {
   reactStrictMode: true,
-  
-  // Output standalone para Docker
-  output: 'standalone',
-  
-  // Rewrites para API
+
   async rewrites() {
-    return [
-      {
-        source: '/api/v1/companies',
-        destination: `${apiUrl}/api/v1/companies/`,
-      },
-      {
-        source: '/api/v1/plans',
-        destination: `${apiUrl}/api/v1/plans/`,
-      },
-      {
-        source: '/api/v1/:path*',
-        destination: `${apiUrl}/api/v1/:path*`,
-      },
-    ]
+    return {
+      beforeFiles: [
+        {
+          source: '/api/v1/tickets',
+          destination: `${apiUrl}/api/v1/tickets/`,
+        },
+        {
+          source: '/api/v1/tickets/:path*',
+          destination: `${apiUrl}/api/v1/tickets/:path*`,
+        },
+        {
+          source: '/api/:path*',
+          destination: `${apiUrl}/api/:path*`,
+        },
+      ],
+    }
   },
-  
-  // Otimizações de produção
+
   compiler: {
-    // Remove console.log em produção
     removeConsole: process.env.NODE_ENV === 'production',
   },
-  
-  // Headers de segurança
+
   async headers() {
     return [
       {

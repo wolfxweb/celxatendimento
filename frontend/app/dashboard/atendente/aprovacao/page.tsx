@@ -280,7 +280,7 @@ export default function AprovacaoPage() {
                   <div className="flex justify-between items-start">
                     <div className="space-y-2">
                       <span className="text-sm text-slate-400 font-mono">{ticket.ticket_number}</span>
-                      <Link href={`/atendente/tickets/${ticket.id}`} className="block">
+                      <Link href={`/dashboard/atendente/tickets/${ticket.id}`} className="block">
                         <h3 className="font-semibold text-lg text-slate-800 hover:text-primary-600 transition-colors">
                           {ticket.subject}
                         </h3>

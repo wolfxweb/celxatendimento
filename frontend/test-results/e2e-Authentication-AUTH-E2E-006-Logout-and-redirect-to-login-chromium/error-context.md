@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Authentication >> AUTH-E2E-006: Logout and redirect to login
-- Location: frontend/tests/e2e.spec.ts:88:7
+- Location: tests/e2e.spec.ts:88:7
 
 # Error details
 

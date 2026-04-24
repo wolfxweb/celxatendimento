@@ -7,7 +7,7 @@
 # Test info
 
 - Name: e2e.spec.ts >> Authentication >> AUTH-E2E-002: Login as Customer
-- Location: frontend/tests/e2e.spec.ts:68:7
+- Location: tests/e2e.spec.ts:68:7
 
 # Error details
 
