@@ -12,6 +12,70 @@ const nextConfig = {
           destination: `${apiUrl}/api/v1/tickets/`,
         },
         {
+          source: '/api/v1/tickets/:ticketId/audit-log',
+          destination: `${apiUrl}/api/v1/tickets/:ticketId/audit-log`,
+        },
+        {
+          source: '/api/v1/tickets/:ticketId/relations',
+          destination: `${apiUrl}/api/v1/tickets/:ticketId/relations`,
+        },
+        {
+          source: '/api/v1/tickets/:ticketId/messages',
+          destination: `${apiUrl}/api/v1/tickets/:ticketId/messages`,
+        },
+        {
+          source: '/api/v1/tickets/:ticketId/assign',
+          destination: `${apiUrl}/api/v1/tickets/:ticketId/assign`,
+        },
+        {
+          source: '/api/v1/tickets/:ticketId/rate',
+          destination: `${apiUrl}/api/v1/tickets/:ticketId/rate`,
+        },
+        {
+          source: '/api/v1/tickets/:ticketId/ai/approve',
+          destination: `${apiUrl}/api/v1/tickets/:ticketId/ai/approve`,
+        },
+        {
+          source: '/api/v1/tickets/:ticketId/ai/reject',
+          destination: `${apiUrl}/api/v1/tickets/:ticketId/ai/reject`,
+        },
+        {
+          source: '/api/v1/tickets/:ticketId/ai/edit',
+          destination: `${apiUrl}/api/v1/tickets/:ticketId/ai/edit`,
+        },
+        {
+          source: '/api/v1/tickets/:ticketId/ai/feedback',
+          destination: `${apiUrl}/api/v1/tickets/:ticketId/ai/feedback`,
+        },
+        {
+          source: '/api/v1/tickets/:ticketId/ai/example',
+          destination: `${apiUrl}/api/v1/tickets/:ticketId/ai/example`,
+        },
+        {
+          source: '/api/v1/tickets/ai/stats',
+          destination: `${apiUrl}/api/v1/tickets/ai/stats`,
+        },
+        {
+          source: '/api/v1/categories',
+          destination: `${apiUrl}/api/v1/categories/`,
+        },
+        {
+          source: '/api/v1/ai-config',
+          destination: `${apiUrl}/api/v1/ai-config/`,
+        },
+        {
+          source: '/api/v1/companies',
+          destination: `${apiUrl}/api/v1/companies/`,
+        },
+        {
+          source: '/api/v1/plans',
+          destination: `${apiUrl}/api/v1/plans/`,
+        },
+        {
+          source: '/api/v1/users/me',
+          destination: `${apiUrl}/api/v1/users/me`,
+        },
+        {
           source: '/api/v1/tickets/:path*',
           destination: `${apiUrl}/api/v1/tickets/:path*`,
         },

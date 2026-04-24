@@ -198,7 +198,7 @@ async def get_ticket(
 ):
     """Get ticket details with messages"""
 
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -314,7 +314,7 @@ async def update_ticket(
 ):
     """Update ticket fields"""
 
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -350,7 +350,7 @@ async def add_message(
 ):
     """Add a message to a ticket"""
 
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -416,7 +416,7 @@ async def assign_ticket(
             detail="Only agents and admins can assign tickets",
         )
 
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -462,7 +462,7 @@ async def approve_ai_response(
             detail="Only agents and admins can approve AI responses",
         )
 
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -530,7 +530,7 @@ async def reject_ai_response(
             detail="Only agents and admins can reject AI responses",
         )
 
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -599,7 +599,7 @@ async def edit_ai_response(
             detail="Only agents and admins can edit AI responses",
         )
 
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -667,7 +667,7 @@ async def delete_ticket(
 ):
     """Soft delete a ticket"""
 
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -719,7 +719,7 @@ async def submit_ai_feedback(
 
     service = AIFeedbackService(db)
     result = await service.submit_feedback(
-        ticket_id=uuid.UUID(ticket_id),
+        ticket_id=int(ticket_id),
         agent_id=current_user.id,
         rating=rating,
         feedback_text=feedback,
@@ -758,7 +758,7 @@ async def mark_ai_as_example(
 
     service = AIFeedbackService(db)
     result = await service.mark_as_example(
-        ticket_id=uuid.UUID(ticket_id),
+        ticket_id=int(ticket_id),
         agent_id=current_user.id,
         is_good=is_good,
         reason=reason,
@@ -821,7 +821,7 @@ async def rate_ticket(
     """
 
     # Only customers can rate their own tickets
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -880,7 +880,7 @@ async def get_ticket_relations(
 ):
     """Get all related tickets for a ticket"""
 
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -893,7 +893,7 @@ async def get_ticket_relations(
     from app.models.ticket_relation import TicketRelation
 
     rel_result = await db.execute(
-        select(TicketRelation).where(TicketRelation.ticket_id == uuid.UUID(ticket_id))
+        select(TicketRelation).where(TicketRelation.ticket_id == int(ticket_id))
     )
     relations = rel_result.scalars().all()
 
@@ -950,7 +950,7 @@ async def create_ticket_relation(
         )
 
     # Get main ticket
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -977,7 +977,7 @@ async def create_ticket_relation(
     exists_result = await db.execute(
         select(TicketRelation).where(
             and_(
-                TicketRelation.ticket_id == uuid.UUID(ticket_id),
+                TicketRelation.ticket_id == int(ticket_id),
                 TicketRelation.related_ticket_id == uuid.UUID(related_ticket_id),
                 TicketRelation.relation_type == relation_type,
             )
@@ -1037,7 +1037,7 @@ async def delete_ticket_relation(
         select(TicketRelation).where(
             and_(
                 TicketRelation.id == relation_id,
-                TicketRelation.ticket_id == uuid.UUID(ticket_id),
+                TicketRelation.ticket_id == int(ticket_id),
             )
         )
     )
@@ -1056,7 +1056,7 @@ async def delete_ticket_relation(
     from app.models.ticket_audit_log import TicketAuditLog
 
     audit_log = TicketAuditLog(
-        ticket_id=uuid.UUID(ticket_id),
+        ticket_id=int(ticket_id),
         action_type="relation_removed",
         user_id=current_user.id,
         user_role=current_user.role,
@@ -1075,7 +1075,7 @@ async def get_ticket_audit_log(
 ):
     """Get the audit log for a ticket (all changes)"""
 
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -1089,7 +1089,7 @@ async def get_ticket_audit_log(
 
     log_result = await db.execute(
         select(TicketAuditLog)
-        .where(TicketAuditLog.ticket_id == uuid.UUID(ticket_id))
+        .where(TicketAuditLog.ticket_id == int(ticket_id))
         .order_by(TicketAuditLog.created_at.desc())
     )
     logs = log_result.scalars().all()

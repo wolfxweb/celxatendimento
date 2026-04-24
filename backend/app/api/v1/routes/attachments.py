@@ -50,7 +50,7 @@ async def upload_attachment(
     """
 
     # Validate ticket exists and user has access
-    result = await db.execute(select(Ticket).where(Ticket.id == uuid.UUID(ticket_id)))
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
     ticket = result.scalar_one_or_none()
 
     if not ticket:
@@ -112,7 +112,7 @@ async def list_attachments(
     """List all attachments for a ticket"""
 
     service = AttachmentService(db)
-    attachments = await service.get_ticket_attachments(uuid.UUID(ticket_id))
+    attachments = await service.get_ticket_attachments(int(ticket_id))
 
     return [
         {
@@ -157,6 +157,6 @@ async def get_attachment_stats(
     """Get attachment statistics for a ticket"""
 
     service = AttachmentService(db)
-    stats = await service.get_attachment_stats(uuid.UUID(ticket_id))
+    stats = await service.get_attachment_stats(int(ticket_id))
 
     return stats
