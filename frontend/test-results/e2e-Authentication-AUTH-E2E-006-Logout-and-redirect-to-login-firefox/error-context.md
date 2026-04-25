@@ -7,12 +7,16 @@
 # Test info
 
 - Name: e2e.spec.ts >> Authentication >> AUTH-E2E-006: Logout and redirect to login
-- Location: tests/e2e.spec.ts:88:7
+- Location: frontend/tests/e2e.spec.ts:88:7
 
 # Error details
 
 ```
-TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+Test timeout of 30000ms exceeded.
+```
+
+```
+Error: page.waitForURL: Test timeout of 30000ms exceeded.
 =========================== logs ===========================
 waiting for navigation until "load"
 ============================================================
@@ -21,57 +25,54 @@ waiting for navigation until "load"
 # Page snapshot
 
 ```yaml
-- generic [ref=e1]:
+- generic [active] [ref=e1]:
   - generic [ref=e8]:
     - generic [ref=e9]:
       - generic [ref=e11]: C
       - heading "celx-atendimento" [level=1] [ref=e12]
       - paragraph [ref=e13]: Sistema de tickets com IA
     - generic [ref=e15]:
-      - generic [ref=e16]: Email ou senha incorretos
-      - generic [ref=e17]:
+      - generic [ref=e16]:
         - text: Email
-        - textbox "Email" [ref=e19]:
+        - textbox "Email" [ref=e18]:
           - /placeholder: seu@email.com
           - text: admin@celx.com.br
-      - generic [ref=e20]:
+      - generic [ref=e19]:
         - text: Senha
-        - textbox "Senha" [ref=e22]:
+        - textbox "Senha" [ref=e21]:
           - /placeholder: ••••••••
           - text: admin123
-      - button "Entrar →" [active] [ref=e23] [cursor=pointer]:
-        - generic [ref=e25]:
-          - text: Entrar
-          - generic [ref=e26]: →
-    - generic [ref=e29]:
-      - paragraph [ref=e30]: 👆 Clique para preencher automaticamente
-      - generic [ref=e31]:
-        - button "👑 Super Admin superadmin@celx.com.br admin123" [ref=e32] [cursor=pointer]:
-          - generic [ref=e33]: 👑
-          - generic [ref=e34]:
-            - generic [ref=e35]: Super Admin
-            - generic [ref=e36]: superadmin@celx.com.br
-          - generic [ref=e37]: admin123
-        - button "⚡ Admin admin@celx.com.br admin123" [ref=e38] [cursor=pointer]:
-          - generic [ref=e39]: ⚡
-          - generic [ref=e40]:
-            - generic [ref=e41]: Admin
-            - generic [ref=e42]: admin@celx.com.br
-          - generic [ref=e43]: admin123
-        - button "👨‍💻 Atendente agente@celx.com.br agente123" [ref=e44] [cursor=pointer]:
-          - generic [ref=e45]: 👨‍💻
-          - generic [ref=e46]:
-            - generic [ref=e47]: Atendente
-            - generic [ref=e48]: agente@celx.com.br
-          - generic [ref=e49]: agente123
-        - button "👤 Cliente cliente@celx.com.br cliente123" [ref=e50] [cursor=pointer]:
-          - generic [ref=e51]: 👤
-          - generic [ref=e52]:
-            - generic [ref=e53]: Cliente
-            - generic [ref=e54]: cliente@celx.com.br
-          - generic [ref=e55]: cliente123
-    - paragraph [ref=e56]: Sistema de atendimento com inteligência artificial
-  - alert [ref=e57]
+      - button "Entrando..." [disabled] [ref=e22]:
+        - generic [ref=e24]: Entrando...
+    - generic [ref=e28]:
+      - paragraph [ref=e29]: 👆 Clique para preencher automaticamente
+      - generic [ref=e30]:
+        - button "👑 Super Admin superadmin@celx.com.br admin123" [ref=e31] [cursor=pointer]:
+          - generic [ref=e32]: 👑
+          - generic [ref=e33]:
+            - generic [ref=e34]: Super Admin
+            - generic [ref=e35]: superadmin@celx.com.br
+          - generic [ref=e36]: admin123
+        - button "⚡ Admin admin@celx.com.br admin123" [ref=e37] [cursor=pointer]:
+          - generic [ref=e38]: ⚡
+          - generic [ref=e39]:
+            - generic [ref=e40]: Admin
+            - generic [ref=e41]: admin@celx.com.br
+          - generic [ref=e42]: admin123
+        - button "👨‍💻 Atendente agente@celx.com.br agente123" [ref=e43] [cursor=pointer]:
+          - generic [ref=e44]: 👨‍💻
+          - generic [ref=e45]:
+            - generic [ref=e46]: Atendente
+            - generic [ref=e47]: agente@celx.com.br
+          - generic [ref=e48]: agente123
+        - button "👤 Cliente cliente@celx.com.br cliente123" [ref=e49] [cursor=pointer]:
+          - generic [ref=e50]: 👤
+          - generic [ref=e51]:
+            - generic [ref=e52]: Cliente
+            - generic [ref=e53]: cliente@celx.com.br
+          - generic [ref=e54]: cliente123
+    - paragraph [ref=e55]: Sistema de atendimento com inteligência artificial
+  - alert [ref=e56]
 ```
 
 # Test source
@@ -95,7 +96,7 @@ waiting for navigation until "load"
   16  |   await page.fill('#password', USERS[user].password);
   17  |   await page.click('button[type="submit"]');
 > 18  |   await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
-      |              ^ TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+      |              ^ Error: page.waitForURL: Test timeout of 30000ms exceeded.
   19  |   await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
   20  | }
   21  | 

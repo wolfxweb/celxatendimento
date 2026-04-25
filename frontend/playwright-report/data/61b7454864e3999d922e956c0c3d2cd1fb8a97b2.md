@@ -6,22 +6,33 @@
 
 # Test info
 
-- Name: e2e.spec.ts >> Authentication >> AUTH-E2E-004: Login as Super Admin
-- Location: frontend/tests/e2e.spec.ts:76:7
+- Name: e2e.spec.ts >> Authentication >> AUTH-E2E-005: Login with wrong password shows error
+- Location: frontend/tests/e2e.spec.ts:80:7
 
 # Error details
 
 ```
-TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
-=========================== logs ===========================
-waiting for navigation until "load"
-============================================================
+Test timeout of 30000ms exceeded.
+```
+
+```
+Error: page.click: Test timeout of 30000ms exceeded.
+Call log:
+  - waiting for locator('button[type="submit"]')
+    - locator resolved to <button type="submit" class="relative w-full py-4 rounded-xl bg-gradient-primary font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-glow-primary hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 overflow-hidden group">…</button>
+  - attempting click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
+    - performing click action
+
 ```
 
 # Page snapshot
 
 ```yaml
-- generic [active] [ref=e1]:
+- generic [ref=e1]:
   - generic [ref=e8]:
     - generic [ref=e9]:
       - generic [ref=e11]: C
@@ -32,14 +43,16 @@ waiting for navigation until "load"
         - text: Email
         - textbox "Email" [ref=e18]:
           - /placeholder: seu@email.com
-          - text: superadmin@celx.com.br
+          - text: admin@celx.com.br
       - generic [ref=e19]:
         - text: Senha
-        - textbox "Senha" [ref=e21]:
+        - textbox "Senha" [active] [ref=e21]:
           - /placeholder: ••••••••
-          - text: admin123
-      - button "Entrando..." [disabled] [ref=e22]:
-        - generic [ref=e24]: Entrando...
+          - text: wrongpassword
+      - button "Entrar →" [ref=e22] [cursor=pointer]:
+        - generic [ref=e24]:
+          - text: Entrar
+          - generic [ref=e25]: →
     - generic [ref=e28]:
       - paragraph [ref=e29]: 👆 Clique para preencher automaticamente
       - generic [ref=e30]:
@@ -91,8 +104,7 @@ waiting for navigation until "load"
   15  |   await page.fill('#email', USERS[user].email);
   16  |   await page.fill('#password', USERS[user].password);
   17  |   await page.click('button[type="submit"]');
-> 18  |   await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
-      |              ^ TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+  18  |   await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
   19  |   await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
   20  | }
   21  | 
@@ -158,7 +170,8 @@ waiting for navigation until "load"
   81  |     await page.goto(`${BASE_URL}/login`);
   82  |     await page.fill('#email', USERS.admin.email);
   83  |     await page.fill('#password', 'wrongpassword');
-  84  |     await page.click('button[type="submit"]');
+> 84  |     await page.click('button[type="submit"]');
+      |                ^ Error: page.click: Test timeout of 30000ms exceeded.
   85  |     await expect(page.getByText('Email ou senha incorretos')).toBeVisible({ timeout: 5000 });
   86  |   });
   87  | 
@@ -193,4 +206,70 @@ waiting for navigation until "load"
   116 |     await expect(page.locator('#subject')).toBeVisible();
   117 |   });
   118 | 
+  119 |   test('TICK-E2E-004: Create ticket - success', async ({ page }) => {
+  120 |     await page.goto(`${BASE_URL}/dashboard/cliente/tickets/novo`);
+  121 |     page.once('dialog', (dialog) => dialog.accept());
+  122 | 
+  123 |     await page.fill('#subject', `Test Ticket Subject E2E ${Date.now()}`);
+  124 |     await page.fill('#description', 'Test ticket description for E2E test');
+  125 |     await page.click('button[type="submit"]');
+  126 | 
+  127 |     await page.waitForURL('**/dashboard/cliente/tickets', { timeout: 10000 });
+  128 |     await expect(page.getByRole('heading', { level: 1, name: 'Meus Tickets' })).toBeVisible();
+  129 |   });
+  130 | });
+  131 | 
+  132 | test.describe('Agent Ticket Management', () => {
+  133 |   test.beforeEach(async ({ page, request }) => {
+  134 |     await createTicketViaApi(request);
+  135 |     await loginAs(page, 'agent');
+  136 |   });
+  137 | 
+  138 |   test('AGT-E2E-001: View all tickets', async ({ page }) => {
+  139 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
+  140 |     await expect(page.getByRole('heading', { level: 1, name: 'Tickets' })).toBeVisible();
+  141 |   });
+  142 | 
+  143 |   test('AGT-E2E-002: Filter tickets by status', async ({ page }) => {
+  144 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
+  145 |     await page.getByRole('button', { name: /abertos/i }).click();
+  146 |     await expect(page.getByRole('button', { name: /abertos/i })).toBeVisible();
+  147 |   });
+  148 | 
+  149 |   test('AGT-E2E-003: Open ticket detail', async ({ page }) => {
+  150 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
+  151 | 
+  152 |     const ticketLink = page.locator('a[href*="/atendente/tickets/"], a[href*="/dashboard/atendente/tickets/"]').first();
+  153 |     await expect(ticketLink).toBeVisible({ timeout: 10000 });
+  154 |     await ticketLink.click();
+  155 | 
+  156 |     await expect(page.getByText(/cliente:/i)).toBeVisible({ timeout: 10000 });
+  157 |   });
+  158 | 
+  159 |   test('AGT-E2E-005: Send customer message', async ({ page }) => {
+  160 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
+  161 | 
+  162 |     const ticketLink = page.locator('a[href*="/atendente/tickets/"], a[href*="/dashboard/atendente/tickets/"]').first();
+  163 |     await expect(ticketLink).toBeVisible({ timeout: 10000 });
+  164 |     await ticketLink.click();
+  165 | 
+  166 |     const messageInput = page.locator('textarea').first();
+  167 |     await expect(messageInput).toBeVisible({ timeout: 10000 });
+  168 |     await messageInput.fill('Test message from agent E2E');
+  169 |     await page.getByRole('button', { name: /enviar|responder/i }).click();
+  170 |   });
+  171 | });
+  172 | 
+  173 | test.describe('AI Approval Page', () => {
+  174 |   test.beforeEach(async ({ page }) => {
+  175 |     await loginAs(page, 'agent');
+  176 |   });
+  177 | 
+  178 |   test('AI-E2E-001: View pending AI approvals', async ({ page }) => {
+  179 |     await page.goto(`${BASE_URL}/dashboard/atendente/aprovacao`);
+  180 |     await expect(page.getByRole('heading', { level: 1, name: 'Aprovação de IA' })).toBeVisible({ timeout: 5000 });
+  181 |   });
+  182 | });
+  183 | 
+  184 | test.describe('Admin User Management', () => {
 ```
