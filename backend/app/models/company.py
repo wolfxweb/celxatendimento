@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -15,10 +15,6 @@ class Company(Base, TimestampMixin):
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     domain: Mapped[str] = mapped_column(String(255), nullable=True)
-    document: Mapped[str] = mapped_column(String(20), unique=True, nullable=True)
-    email: Mapped[str] = mapped_column(String(255), nullable=True)
-    phone: Mapped[str] = mapped_column(String(20), nullable=True)
-    address: Mapped[str] = mapped_column(Text, nullable=True)
     logo_url: Mapped[str] = mapped_column(String(500), nullable=True)
 
     # Status
@@ -45,5 +41,7 @@ class Company(Base, TimestampMixin):
     billing_email: Mapped[str] = mapped_column(String(255), nullable=True)
     billing_address: Mapped[dict] = mapped_column(JSONB, nullable=True)
 
-    # Status
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # Counters
+    total_users: Mapped[int] = mapped_column(Integer, default=0)
+    total_tickets: Mapped[int] = mapped_column(Integer, default=0)
+    tickets_this_month: Mapped[int] = mapped_column(Integer, default=0)

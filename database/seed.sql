@@ -15,9 +15,9 @@ ON CONFLICT (domain) DO NOTHING;
 -- Usuários CELX (company_id = 1)
 -- Senhas: admin123, agente123, cliente123
 INSERT INTO users (company_id, email, password_hash, name, role, is_active, is_email_verified) VALUES
-(1, 'admin@celx.com.br', '$2b$12$hwzMDU69r4FgHLV9MB5ge.UFqyx0tTTH81XfhnH1g6TY6j/GcrWvu', 'Administrador', 'admin', TRUE, TRUE),
-(1, 'agente@celx.com.br', '$2b$12$Ae/PPeIc0QyFolpC/iUyhOMFiUKzRKDEAztJPxlcJDCEkaLGXLgkq', 'Agente Silva', 'agent', TRUE, TRUE),
-(1, 'cliente@celx.com.br', '$2b$12$GtaUBpys0wGnffDU7CnX3.rd8pU0pse8JoHvSIby9KgoHhJbyYZrO', 'João Cliente', 'customer', TRUE, TRUE)
+(1, 'admin@celx.com.br', '$2b$12$RN4Da5jFscjedt1J8mc6Cef8Eh1rNOHiOd5nOIH85NUztPoWps8US', 'Administrador', 'admin', TRUE, TRUE),
+(1, 'agente@celx.com.br', '$2b$12$pnwzoUg1t0.sArS8d2vLYeC.IhYfNRwFMq6Wv0LpaGhWXo2ibnIq.', 'Agente Silva', 'agent', TRUE, TRUE),
+(1, 'cliente@celx.com.br', '$2b$12$D.qMYzeDOGnHdAKBbz/4NeM4/YxSJCHdVS7b.78ubCLdKV5jVO5Am', 'João Cliente', 'customer', TRUE, TRUE)
 ON CONFLICT (company_id, email) DO NOTHING;
 
 -- Empresa de testes (company_id = 2)
@@ -45,7 +45,7 @@ ON CONFLICT (company_id, name) DO NOTHING;
 
 -- Super Admin do sistema
 INSERT INTO users (company_id, email, password_hash, name, role, is_active, is_email_verified) VALUES
-(NULL, 'superadmin@celx.com.br', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.FRnFJ4v0lWfIyG', 'Super Admin', 'superadmin', TRUE, TRUE)
+(NULL, 'superadmin@celx.com.br', '$2b$12$RN4Da5jFscjedt1J8mc6Cef8Eh1rNOHiOd5nOIH85NUztPoWps8US', 'Super Admin', 'superadmin', TRUE, TRUE)
 ON CONFLICT DO NOTHING;
 
 -- Configuração de IA da empresa teste

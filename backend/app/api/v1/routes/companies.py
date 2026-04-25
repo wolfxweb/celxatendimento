@@ -1,9 +1,9 @@
 from datetime import datetime
 from typing import Optional, List
-import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, and_
+from pydantic import BaseModel
+from sqlalchemy import String, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_active_user, get_current_superuser
@@ -14,6 +14,11 @@ from app.models.user import User
 router = APIRouter(prefix="/companies", tags=["companies"])
 
 
+class RejectCompanyRequest(BaseModel):
+    reason: str
+
+
+@router.get("", response_model=List[dict], include_in_schema=False)
 @router.get("/", response_model=List[dict])
 async def list_companies(
     status_filter: Optional[str] = None,
@@ -32,7 +37,7 @@ async def list_companies(
     query = select(Company)
 
     if status_filter:
-        query = query.where(Company.status == status_filter)
+        query = query.where(cast(Company.status, String) == status_filter)
 
     query = query.order_by(Company.created_at.desc())
 
@@ -59,22 +64,20 @@ async def list_companies(
 
 @router.get("/{company_id}", response_model=dict)
 async def get_company(
-    company_id: str,
+    company_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
     """Get company details"""
 
     # Users can get their own company, superadmins can get any
-    if current_user.role != "superadmin" and str(current_user.company_id) != company_id:
+    if current_user.role != "superadmin" and current_user.company_id != company_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
         )
 
-    result = await db.execute(
-        select(Company).where(Company.id == uuid.UUID(company_id))
-    )
+    result = await db.execute(select(Company).where(Company.id == company_id))
     company = result.scalar_one_or_none()
 
     if not company:
@@ -103,15 +106,13 @@ async def get_company(
 
 @router.post("/{company_id}/approve", status_code=status.HTTP_200_OK)
 async def approve_company(
-    company_id: str,
+    company_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_superuser),
 ):
     """Approve a pending company"""
 
-    result = await db.execute(
-        select(Company).where(Company.id == uuid.UUID(company_id))
-    )
+    result = await db.execute(select(Company).where(Company.id == company_id))
     company = result.scalar_one_or_none()
 
     if not company:
@@ -137,16 +138,14 @@ async def approve_company(
 
 @router.post("/{company_id}/reject", status_code=status.HTTP_200_OK)
 async def reject_company(
-    company_id: str,
-    reason: str,
+    company_id: int,
+    reject_data: RejectCompanyRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_superuser),
 ):
     """Reject a pending company"""
 
-    result = await db.execute(
-        select(Company).where(Company.id == uuid.UUID(company_id))
-    )
+    result = await db.execute(select(Company).where(Company.id == company_id))
     company = result.scalar_one_or_none()
 
     if not company:
@@ -162,7 +161,7 @@ async def reject_company(
         )
 
     company.status = "cancelled"
-    company.status_reason = reason
+    company.status_reason = reject_data.reason
     company.approved_by = current_user.id
     company.approved_at = datetime.now()
 
@@ -173,15 +172,13 @@ async def reject_company(
 
 @router.post("/{company_id}/suspend", status_code=status.HTTP_200_OK)
 async def suspend_company(
-    company_id: str,
+    company_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_superuser),
 ):
     """Suspend an active company"""
 
-    result = await db.execute(
-        select(Company).where(Company.id == uuid.UUID(company_id))
-    )
+    result = await db.execute(select(Company).where(Company.id == company_id))
     company = result.scalar_one_or_none()
 
     if not company:

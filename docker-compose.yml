@@ -171,12 +171,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://host.docker.internal:8000
+        NEXT_PUBLIC_API_URL: http://localhost:8000
     container_name: celx-frontend
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: http://host.docker.internal:8000
+      NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     ports:
       - "${FRONTEND_PORT:-3000}:3000"

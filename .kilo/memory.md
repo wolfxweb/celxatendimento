@@ -9,3 +9,7 @@
 - **Ação futura:** Sempre que iniciar uma tarefa complexa, o orquestrador deve dividir o escopo entre os especialistas em vez de tentar resolver tudo em um único arquivo.
 
 *(Novos aprendizados devem ser adicionados abaixo desta linha)*
+
+### [2026-04-25] Rotas de empresas usam ID inteiro, não UUID
+- **Contexto:** A tela "Gerenciar Empresas" chamava `/api/v1/companies?status_filter=pending` e recebeu 404/500. O backend só aceitava `/companies/`, tentava converter `company_id` para UUID e comparava o ENUM `company_status` com `VARCHAR`.
+- **Decisão:** `companies.id` é `integer` no PostgreSQL. Nunca usar `uuid.UUID(company_id)` nas rotas de empresas. Como `redirect_slashes=False`, endpoints chamados sem barra final pelo frontend precisam existir sem barra. Para filtros em `companies.status`, usar cast para string ou tipo compatível com o ENUM.
