@@ -4,7 +4,7 @@ RAG Service for Knowledge Base management and search
 
 import uuid
 from datetime import datetime
-from typing import Optional, list
+from typing import Optional
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -31,6 +31,7 @@
 5. No módulo de empresas, `companies.id` é `integer` no PostgreSQL. Nunca converta `company_id` para UUID nas rotas, models, schemas ou queries.
 6. A coluna `companies.status` é ENUM no PostgreSQL (`company_status`). Ao filtrar por query string, faça cast para string ou use tipagem compatível com o ENUM; não compare ENUM diretamente com `VARCHAR`.
 7. O frontend chama alguns endpoints sem barra final, como `/api/v1/companies?status_filter=pending`. Como o FastAPI está com `redirect_slashes=False`, rotas de coleção usadas pelo frontend devem aceitar explicitamente a versão sem barra final quando necessário.
+8. Em routers FastAPI, declare rotas estáticas/específicas antes de rotas dinâmicas como `/{id}`. Exemplo: `/tickets/ai/stats` deve vir antes de `/tickets/{ticket_id}`, senão `ai` será tratado como `ticket_id`.
 
 ### Frontend (Next.js/React)
 1. Use Server Components por padrão. Só utilize `'use client'` quando precisar de interatividade ou hooks.

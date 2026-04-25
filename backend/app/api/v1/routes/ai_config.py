@@ -3,12 +3,13 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_active_user
 from app.database import get_db
 from app.models.user import User
-from app.services.ai_config_service import AIConfigService
+from app.services.ai_config_service import AIConfigService, DEFAULT_SYSTEM_PROMPT
 
 router = APIRouter(prefix="/ai-config", tags=["ai-config"])
 
@@ -27,6 +28,29 @@ class APIKeyUpdate(BaseModel):
     api_key: str
 
 
+def default_ai_config_response(company_id: int) -> dict:
+    return {
+        "config": {
+            "id": None,
+            "company_id": str(company_id),
+            "provider_id": 1,
+            "api_key_is_set": False,
+            "llm_model": "google/gemini-1.5-flash",
+            "temperature": 0.7,
+            "max_tokens": 2048,
+            "embedding_model": "text-embedding-3-small",
+            "system_prompt": DEFAULT_SYSTEM_PROMPT,
+            "tools": ["rag"],
+            "autonomy_level": "low",
+            "is_active": True,
+        },
+        "llm_models": [],
+        "embedding_models": [],
+        "tools": [],
+    }
+
+
+@router.get("", include_in_schema=False)
 @router.get("/")
 async def get_ai_config(
     db: AsyncSession = Depends(get_db),
@@ -34,18 +58,24 @@ async def get_ai_config(
 ):
     """Get full AI configuration including available models and tools"""
 
-    if not current_user.company_id:
+    company_id = current_user.company_id
+    if not company_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User must belong to a company",
         )
 
     service = AIConfigService(db)
-    result = await service.get_full_config(current_user.company_id)
+    try:
+        result = await service.get_full_config(company_id)
+    except SQLAlchemyError:
+        await db.rollback()
+        result = default_ai_config_response(company_id)
 
     return result
 
 
+@router.put("", include_in_schema=False)
 @router.put("/")
 async def update_ai_config(
     config_data: AIConfigUpdate,

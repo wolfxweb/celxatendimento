@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import select, and_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ticket_ai_response import TicketAIResponse
@@ -170,7 +171,7 @@ class AIFeedbackService:
 
     async def get_feedback_stats(
         self,
-        company_id: uuid.UUID,
+        company_id: int,
         days: int = 30,
     ) -> dict:
         """
@@ -185,27 +186,34 @@ class AIFeedbackService:
         """
         from app.models.ticket import Ticket
 
-        # Get all AI responses for this company's tickets
-        result = await self.db.execute(
-            select(TicketAIResponse)
-            .join(Ticket, Ticket.id == TicketAIResponse.ticket_id)
-            .where(
-                and_(
-                    Ticket.company_id == company_id,
-                    TicketAIResponse.ai_rating.isnot(None),
+        empty_stats = {
+            "total_rated": 0,
+            "average_rating": 0,
+            "rating_distribution": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
+            "good_examples": 0,
+            "bad_examples": 0,
+        }
+
+        try:
+            # Get all AI responses for this company's tickets
+            result = await self.db.execute(
+                select(TicketAIResponse)
+                .join(Ticket, Ticket.id == TicketAIResponse.ticket_id)
+                .where(
+                    and_(
+                        Ticket.company_id == company_id,
+                        TicketAIResponse.ai_rating.isnot(None),
+                    )
                 )
             )
-        )
+        except SQLAlchemyError:
+            await self.db.rollback()
+            return empty_stats
+
         responses = result.scalars().all()
 
         if not responses:
-            return {
-                "total_rated": 0,
-                "average_rating": 0,
-                "rating_distribution": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0},
-                "good_examples": 0,
-                "bad_examples": 0,
-            }
+            return empty_stats
 
         # Calculate statistics
         ratings = [r.ai_rating for r in responses if r.ai_rating]

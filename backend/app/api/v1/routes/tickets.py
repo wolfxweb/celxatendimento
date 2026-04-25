@@ -32,6 +32,39 @@ from app.schemas.ticket import (
 router = APIRouter(prefix="/tickets", tags=["tickets"])
 
 
+@router.get("/ai/stats", status_code=status.HTTP_200_OK)
+async def get_ai_feedback_stats(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """
+    Get AI feedback statistics for the company.
+    """
+
+    if current_user.role not in ["agent", "admin", "superadmin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
+    if not current_user.company_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User must belong to a company",
+        )
+
+    from app.services.ai_feedback_service import AIFeedbackService
+
+    service = AIFeedbackService(db)
+    stats = await service.get_feedback_stats(
+        company_id=current_user.company_id,
+        days=30,
+    )
+
+    return stats
+
+
+@router.post("", response_model=TicketResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 @router.post("/", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
 async def create_ticket(
     ticket_data: TicketCreate,
@@ -112,6 +145,7 @@ async def create_ticket(
     return ticket
 
 
+@router.get("", response_model=list[TicketListResponse], include_in_schema=False)
 @router.get("/", response_model=list[TicketListResponse])
 async def list_tickets(
     status: Optional[str] = None,
@@ -771,38 +805,6 @@ async def mark_ai_as_example(
         )
 
     return result
-
-
-@router.get("/ai/stats", status_code=status.HTTP_200_OK)
-async def get_ai_feedback_stats(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """
-    Get AI feedback statistics for the company.
-    """
-
-    if current_user.role not in ["agent", "admin", "superadmin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
-
-    if not current_user.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User must belong to a company",
-        )
-
-    from app.services.ai_feedback_service import AIFeedbackService
-
-    service = AIFeedbackService(db)
-    stats = await service.get_feedback_stats(
-        company_id=current_user.company_id,
-        days=30,
-    )
-
-    return stats
 
 
 @router.post("/{ticket_id}/rate", status_code=status.HTTP_200_OK)

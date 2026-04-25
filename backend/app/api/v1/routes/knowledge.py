@@ -3,6 +3,7 @@ import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, and_
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_active_user
@@ -14,6 +15,31 @@ from app.services.rag_service import RAGService
 router = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
 
+@router.get("/status/indexing")
+async def get_indexing_status(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get indexing status for all articles"""
+
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User must belong to a company",
+        )
+
+    rag_service = RAGService(db)
+    try:
+        status = await rag_service.get_indexing_status(company_id)
+    except SQLAlchemyError:
+        await db.rollback()
+        status = {"total": 0, "indexed": 0, "pending": 0, "errors": 0}
+
+    return status
+
+
+@router.get("", response_model=List[dict], include_in_schema=False)
 @router.get("/", response_model=List[dict])
 async def list_articles(
     include_inactive: bool = False,
@@ -30,7 +56,11 @@ async def list_articles(
         )
 
     rag_service = RAGService(db)
-    articles = await rag_service.get_articles_by_company(company_id, include_inactive)
+    try:
+        articles = await rag_service.get_articles_by_company(company_id, include_inactive)
+    except SQLAlchemyError:
+        await db.rollback()
+        articles = []
 
     return [
         {
@@ -51,6 +81,7 @@ async def list_articles(
     ]
 
 
+@router.post("", status_code=status.HTTP_201_CREATED, include_in_schema=False)
 @router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_article(
     title: str,
@@ -186,23 +217,3 @@ async def delete_article(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Article not found",
         )
-
-
-@router.get("/status/indexing")
-async def get_indexing_status(
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """Get indexing status for all articles"""
-
-    company_id = current_user.company_id
-    if not company_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User must belong to a company",
-        )
-
-    rag_service = RAGService(db)
-    status = await rag_service.get_indexing_status(company_id)
-
-    return status

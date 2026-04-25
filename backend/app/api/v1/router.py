@@ -7,6 +7,7 @@ from app.api.v1.routes import (
     companies,
     ai_config,
     categories,
+    knowledge,
     plans,
     attachments,
 )
@@ -19,5 +20,6 @@ api_router.include_router(tickets.router)
 api_router.include_router(companies.router)
 api_router.include_router(ai_config.router)
 api_router.include_router(categories.router)
+api_router.include_router(knowledge.router)
 api_router.include_router(plans.router)
 api_router.include_router(attachments.router)
