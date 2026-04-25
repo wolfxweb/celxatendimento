@@ -1,7 +1,4 @@
-import uuid
-
 from sqlalchemy import ForeignKey, Integer, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -11,16 +8,16 @@ class TicketAuditLog(Base, TimestampMixin):
     __tablename__ = "ticket_audit_log"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    ticket_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tickets.id"), nullable=False
+    ticket_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickets.id"), nullable=False
     )
 
     # Action type
     action_type: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Who did it
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
     )
     user_role: Mapped[str] = mapped_column(Text, nullable=True)
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import String, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_active_user
@@ -30,6 +30,19 @@ def ensure_admin(current_user: User) -> None:
         )
 
 
+def ensure_can_list_users(current_user: User, role: str | None) -> None:
+    if current_user.role in ["admin", "superadmin"]:
+        return
+
+    if current_user.role == "agent" and role == "agent":
+        return
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Only admins can manage users",
+    )
+
+
 @router.get("/me", response_model=UserResponse)
 async def get_current_user_info(
     db: AsyncSession = Depends(get_db),
@@ -45,13 +58,13 @@ async def list_users(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    ensure_admin(current_user)
+    ensure_can_list_users(current_user, role)
 
     query = select(User)
     if current_user.role != "superadmin":
         query = query.where(User.company_id == current_user.company_id)
     if role:
-        query = query.where(User.role == role)
+        query = query.where(cast(User.role, String) == role)
 
     query = query.order_by(User.created_at.desc())
     result = await db.execute(query)

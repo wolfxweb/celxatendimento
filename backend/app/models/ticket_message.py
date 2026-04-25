@@ -1,8 +1,6 @@
-import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -13,11 +11,11 @@ class TicketMessage(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    ticket_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tickets.id"), nullable=False
+    ticket_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickets.id"), nullable=False
     )
-    author_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    author_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
     )
 
     # Content
@@ -42,7 +40,7 @@ class TicketMessage(Base, TimestampMixin):
 
     # Status
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
-    deleted_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    deleted_by: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
     )
     deleted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: e2e.spec.ts >> Customer Ticket Workflow >> TICK-E2E-002: Filter tickets by status
-- Location: frontend/tests/e2e.spec.ts:107:7
+- Name: e2e.spec.ts >> Authentication >> AUTH-E2E-006: Logout and redirect to login
+- Location: frontend/tests/e2e.spec.ts:88:7
 
 # Error details
 
@@ -15,7 +15,6 @@
 TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
 =========================== logs ===========================
 waiting for navigation until "load"
-  navigated to "http://localhost:3000/dashboard"
 ============================================================
 ```
 
@@ -39,92 +38,113 @@ waiting for navigation until "load"
           - /url: /dashboard/cliente/tickets
           - generic [ref=e17]: 🎫
           - generic [ref=e18]: Meus Tickets
-      - generic [ref=e19]:
-        - generic [ref=e20]:
-          - generic [ref=e22]: J
-          - generic [ref=e23]:
-            - paragraph [ref=e24]: João Cliente
-            - paragraph [ref=e25]: cliente@celx.com.br
-        - link "⬆ Sair" [ref=e26] [cursor=pointer]:
+        - link "📋 Tickets" [ref=e19] [cursor=pointer]:
+          - /url: /dashboard/atendente/tickets
+          - generic [ref=e20]: 📋
+          - generic [ref=e21]: Tickets
+        - link "🤖 Aprovar IA NEW" [ref=e22] [cursor=pointer]:
+          - /url: /dashboard/atendente/aprovacao
+          - generic [ref=e23]: 🤖
+          - generic [ref=e24]: Aprovar IA
+          - generic [ref=e25]: NEW
+        - link "👥 Usuários" [ref=e26] [cursor=pointer]:
+          - /url: /dashboard/admin/usuarios
+          - generic [ref=e27]: 👥
+          - generic [ref=e28]: Usuários
+        - link "⚙️ Config IA" [ref=e29] [cursor=pointer]:
+          - /url: /dashboard/admin/config-ia
+          - generic [ref=e30]: ⚙️
+          - generic [ref=e31]: Config IA
+        - link "📚 Conhecimento" [ref=e32] [cursor=pointer]:
+          - /url: /dashboard/admin/conhecimento
+          - generic [ref=e33]: 📚
+          - generic [ref=e34]: Conhecimento
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e38]: A
+          - generic [ref=e39]:
+            - paragraph [ref=e40]: Administrador
+            - paragraph [ref=e41]: admin@celx.com.br
+        - link "⬆ Sair" [ref=e42] [cursor=pointer]:
           - /url: /login
-          - generic [ref=e27]: ⬆
+          - generic [ref=e43]: ⬆
           - text: Sair
-    - generic [ref=e28]:
-      - banner [ref=e29]:
-        - generic [ref=e30]:
-          - generic [ref=e31]:
-            - heading "Olá, João 👋" [level=2] [ref=e32]
-            - paragraph [ref=e33]: sábado, 25 de abril
-          - generic [ref=e34]:
-            - generic [ref=e35]: customer
-            - button "🔔" [ref=e36] [cursor=pointer]: 🔔
-      - main [ref=e38]:
-        - generic [ref=e40]:
-          - generic [ref=e41]:
-            - heading "Dashboard" [level=1] [ref=e42]
-            - paragraph [ref=e43]: Gerencie suas atividades e tickets
-          - generic [ref=e46]:
-            - link "🎫 Meus Tickets Visualize e crie tickets de suporte Acessar →" [ref=e47] [cursor=pointer]:
+    - generic [ref=e44]:
+      - banner [ref=e45]:
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - heading "Olá, Administrador 👋" [level=2] [ref=e48]
+            - paragraph [ref=e49]: sábado, 25 de abril
+          - generic [ref=e50]:
+            - generic [ref=e51]: admin
+            - button "🔔" [ref=e52] [cursor=pointer]: 🔔
+      - main [ref=e54]:
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - heading "Dashboard" [level=1] [ref=e58]
+            - paragraph [ref=e59]: Gerencie suas atividades e tickets
+          - generic [ref=e62]:
+            - link "🎫 Meus Tickets Visualize e crie tickets de suporte Acessar →" [ref=e63] [cursor=pointer]:
               - /url: /dashboard/cliente/tickets
-              - generic [ref=e50]:
-                - generic [ref=e51]: 🎫
-                - heading "Meus Tickets" [level=2] [ref=e52]
-                - paragraph [ref=e53]: Visualize e crie tickets de suporte
-                - generic [ref=e54]:
-                  - generic [ref=e55]: Acessar
-                  - generic [ref=e56]: →
-            - link "📋 Tickets Gerencie tickets da empresa Acessar →" [ref=e58] [cursor=pointer]:
+              - generic [ref=e66]:
+                - generic [ref=e67]: 🎫
+                - heading "Meus Tickets" [level=2] [ref=e68]
+                - paragraph [ref=e69]: Visualize e crie tickets de suporte
+                - generic [ref=e70]:
+                  - generic [ref=e71]: Acessar
+                  - generic [ref=e72]: →
+            - link "📋 Tickets Gerencie tickets da empresa Acessar →" [ref=e74] [cursor=pointer]:
               - /url: /dashboard/atendente/tickets
-              - generic [ref=e61]:
-                - generic [ref=e62]: 📋
-                - heading "Tickets" [level=2] [ref=e63]
-                - paragraph [ref=e64]: Gerencie tickets da empresa
-                - generic [ref=e65]:
-                  - generic [ref=e66]: Acessar
-                  - generic [ref=e67]: →
-            - link "🤖 Pendente Aprovar IA Revise respostas geradas por IA Acessar →" [ref=e69] [cursor=pointer]:
+              - generic [ref=e77]:
+                - generic [ref=e78]: 📋
+                - heading "Tickets" [level=2] [ref=e79]
+                - paragraph [ref=e80]: Gerencie tickets da empresa
+                - generic [ref=e81]:
+                  - generic [ref=e82]: Acessar
+                  - generic [ref=e83]: →
+            - link "🤖 Pendente Aprovar IA Revise respostas geradas por IA Acessar →" [ref=e85] [cursor=pointer]:
               - /url: /dashboard/atendente/aprovacao
-              - generic [ref=e72]:
-                - generic [ref=e73]: 🤖
-                - generic [ref=e74]: Pendente
-                - heading "Aprovar IA" [level=2] [ref=e75]
-                - paragraph [ref=e76]: Revise respostas geradas por IA
-                - generic [ref=e77]:
-                  - generic [ref=e78]: Acessar
-                  - generic [ref=e79]: →
-          - generic [ref=e81]:
-            - generic [ref=e82]:
-              - generic [ref=e83]:
-                - heading "Atividade Recente" [level=3] [ref=e84]
-                - generic [ref=e86]: 📊
-              - generic [ref=e87]:
-                - generic [ref=e88]:
-                  - generic [ref=e90]: "Ticket #123 resolvido com sucesso"
-                  - generic [ref=e91]: 2h atrás
-                - generic [ref=e92]:
-                  - generic [ref=e94]: Nova resposta IA pendente
-                  - generic [ref=e95]: 4h atrás
-                - generic [ref=e96]:
-                  - generic [ref=e98]: "Ticket #122 atribuído a você"
-                  - generic [ref=e99]: 1d atrás
-            - generic [ref=e103]:
-              - generic [ref=e104]:
-                - heading "Estatísticas" [level=3] [ref=e105]
-                - generic [ref=e107]: ⚡
-              - generic [ref=e108]:
-                - generic [ref=e109]:
-                  - generic [ref=e110]: "12"
-                  - generic [ref=e111]: Tickets Abertos
+              - generic [ref=e88]:
+                - generic [ref=e89]: 🤖
+                - generic [ref=e90]: Pendente
+                - heading "Aprovar IA" [level=2] [ref=e91]
+                - paragraph [ref=e92]: Revise respostas geradas por IA
+                - generic [ref=e93]:
+                  - generic [ref=e94]: Acessar
+                  - generic [ref=e95]: →
+          - generic [ref=e97]:
+            - generic [ref=e98]:
+              - generic [ref=e99]:
+                - heading "Atividade Recente" [level=3] [ref=e100]
+                - generic [ref=e102]: 📊
+              - generic [ref=e103]:
+                - generic [ref=e104]:
+                  - generic [ref=e106]: "Ticket #123 resolvido com sucesso"
+                  - generic [ref=e107]: 2h atrás
+                - generic [ref=e108]:
+                  - generic [ref=e110]: Nova resposta IA pendente
+                  - generic [ref=e111]: 4h atrás
                 - generic [ref=e112]:
-                  - generic [ref=e113]: "8"
-                  - generic [ref=e114]: Resolvidos Hoje
-                - generic [ref=e115]:
-                  - generic [ref=e116]: "3"
-                  - generic [ref=e117]: Aguardando IA
-                - generic [ref=e118]:
-                  - generic [ref=e119]: 98%
-                  - generic [ref=e120]: Satisfação
-  - alert [ref=e121]
+                  - generic [ref=e114]: "Ticket #122 atribuído a você"
+                  - generic [ref=e115]: 1d atrás
+            - generic [ref=e119]:
+              - generic [ref=e120]:
+                - heading "Estatísticas" [level=3] [ref=e121]
+                - generic [ref=e123]: ⚡
+              - generic [ref=e124]:
+                - generic [ref=e125]:
+                  - generic [ref=e126]: "12"
+                  - generic [ref=e127]: Tickets Abertos
+                - generic [ref=e128]:
+                  - generic [ref=e129]: "8"
+                  - generic [ref=e130]: Resolvidos Hoje
+                - generic [ref=e131]:
+                  - generic [ref=e132]: "3"
+                  - generic [ref=e133]: Aguardando IA
+                - generic [ref=e134]:
+                  - generic [ref=e135]: 98%
+                  - generic [ref=e136]: Satisfação
+  - alert [ref=e137]
 ```
 
 # Test source

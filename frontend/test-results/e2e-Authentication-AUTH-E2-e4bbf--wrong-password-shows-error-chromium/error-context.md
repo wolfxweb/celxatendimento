@@ -6,20 +6,79 @@
 
 # Test info
 
-- Name: e2e.spec.ts >> Authentication >> AUTH-E2E-002: Login as Customer
-- Location: frontend/tests/e2e.spec.ts:68:7
+- Name: e2e.spec.ts >> Authentication >> AUTH-E2E-005: Login with wrong password shows error
+- Location: frontend/tests/e2e.spec.ts:80:7
 
 # Error details
 
 ```
-Test timeout of 30000ms exceeded while running "beforeEach" hook.
-```
+Error: expect(locator).toBeVisible() failed
 
-```
-Error: page.goto: Test timeout of 30000ms exceeded.
+Locator: getByText('Email ou senha incorretos')
+Expected: visible
+Timeout: 5000ms
+Error: element(s) not found
+
 Call log:
-  - navigating to "http://localhost:3000/", waiting until "load"
+  - Expect "toBeVisible" with timeout 5000ms
+  - waiting for getByText('Email ou senha incorretos')
 
+```
+
+# Page snapshot
+
+```yaml
+- generic [active] [ref=e1]:
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e11]: C
+      - heading "celx-atendimento" [level=1] [ref=e12]
+      - paragraph [ref=e13]: Sistema de tickets com IA
+    - generic [ref=e15]:
+      - generic [ref=e16]: Email ou senha incorretos
+      - generic [ref=e17]:
+        - text: Email
+        - textbox "Email" [ref=e19]:
+          - /placeholder: seu@email.com
+          - text: admin@celx.com.br
+      - generic [ref=e20]:
+        - text: Senha
+        - textbox "Senha" [ref=e22]:
+          - /placeholder: ••••••••
+          - text: wrongpassword
+      - button "Entrar →" [ref=e23] [cursor=pointer]:
+        - generic [ref=e25]:
+          - text: Entrar
+          - generic [ref=e26]: →
+    - generic [ref=e29]:
+      - paragraph [ref=e30]: 👆 Clique para preencher automaticamente
+      - generic [ref=e31]:
+        - button "👑 Super Admin superadmin@celx.com.br admin123" [ref=e32] [cursor=pointer]:
+          - generic [ref=e33]: 👑
+          - generic [ref=e34]:
+            - generic [ref=e35]: Super Admin
+            - generic [ref=e36]: superadmin@celx.com.br
+          - generic [ref=e37]: admin123
+        - button "⚡ Admin admin@celx.com.br admin123" [ref=e38] [cursor=pointer]:
+          - generic [ref=e39]: ⚡
+          - generic [ref=e40]:
+            - generic [ref=e41]: Admin
+            - generic [ref=e42]: admin@celx.com.br
+          - generic [ref=e43]: admin123
+        - button "👨‍💻 Atendente agente@celx.com.br agente123" [ref=e44] [cursor=pointer]:
+          - generic [ref=e45]: 👨‍💻
+          - generic [ref=e46]:
+            - generic [ref=e47]: Atendente
+            - generic [ref=e48]: agente@celx.com.br
+          - generic [ref=e49]: agente123
+        - button "👤 Cliente cliente@celx.com.br cliente123" [ref=e50] [cursor=pointer]:
+          - generic [ref=e51]: 👤
+          - generic [ref=e52]:
+            - generic [ref=e53]: Cliente
+            - generic [ref=e54]: cliente@celx.com.br
+          - generic [ref=e55]: cliente123
+    - paragraph [ref=e56]: Sistema de atendimento com inteligência artificial
+  - alert [ref=e57]
 ```
 
 # Test source
@@ -84,8 +143,7 @@ Call log:
   57  | 
   58  | test.describe('Authentication', () => {
   59  |   test.beforeEach(async ({ page }) => {
-> 60  |     await page.goto(BASE_URL);
-      |                ^ Error: page.goto: Test timeout of 30000ms exceeded.
+  60  |     await page.goto(BASE_URL);
   61  |     await page.evaluate(() => localStorage.clear());
   62  |   });
   63  | 
@@ -110,7 +168,8 @@ Call log:
   82  |     await page.fill('#email', USERS.admin.email);
   83  |     await page.fill('#password', 'wrongpassword');
   84  |     await page.click('button[type="submit"]');
-  85  |     await expect(page.getByText('Email ou senha incorretos')).toBeVisible({ timeout: 5000 });
+> 85  |     await expect(page.getByText('Email ou senha incorretos')).toBeVisible({ timeout: 5000 });
+      |                                                               ^ Error: expect(locator).toBeVisible() failed
   86  |   });
   87  | 
   88  |   test('AUTH-E2E-006: Logout and redirect to login', async ({ page }) => {
@@ -186,4 +245,29 @@ Call log:
   158 | 
   159 |   test('AGT-E2E-005: Send customer message', async ({ page }) => {
   160 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
+  161 | 
+  162 |     const ticketLink = page.locator('a[href*="/atendente/tickets/"], a[href*="/dashboard/atendente/tickets/"]').first();
+  163 |     await expect(ticketLink).toBeVisible({ timeout: 10000 });
+  164 |     await ticketLink.click();
+  165 | 
+  166 |     const messageInput = page.locator('textarea').first();
+  167 |     await expect(messageInput).toBeVisible({ timeout: 10000 });
+  168 |     await messageInput.fill('Test message from agent E2E');
+  169 |     await page.getByRole('button', { name: /enviar|responder/i }).click();
+  170 |   });
+  171 | });
+  172 | 
+  173 | test.describe('AI Approval Page', () => {
+  174 |   test.beforeEach(async ({ page }) => {
+  175 |     await loginAs(page, 'agent');
+  176 |   });
+  177 | 
+  178 |   test('AI-E2E-001: View pending AI approvals', async ({ page }) => {
+  179 |     await page.goto(`${BASE_URL}/dashboard/atendente/aprovacao`);
+  180 |     await expect(page.getByRole('heading', { level: 1, name: 'Aprovação de IA' })).toBeVisible({ timeout: 5000 });
+  181 |   });
+  182 | });
+  183 | 
+  184 | test.describe('Admin User Management', () => {
+  185 |   test.beforeEach(async ({ page }) => {
 ```

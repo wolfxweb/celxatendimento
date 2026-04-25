@@ -6,14 +6,15 @@ from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.config import settings
-from app.database import engine, Base
+from app.database import engine
 from app.models.base import Base as ModelsBase
+import app.models  # noqa: F401 - import models so metadata is populated
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(ModelsBase.metadata.create_all)
     yield
     await engine.dispose()
 

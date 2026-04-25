@@ -1,8 +1,6 @@
-import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -13,8 +11,8 @@ class Category(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
-    company_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("companies.id"), nullable=False
+    company_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("companies.id"), nullable=False
     )
 
     name: Mapped[str] = mapped_column(String(100), nullable=False)

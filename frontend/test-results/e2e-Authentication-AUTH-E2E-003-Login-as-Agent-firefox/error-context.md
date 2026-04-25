@@ -12,13 +12,19 @@
 # Error details
 
 ```
-Test timeout of 30000ms exceeded.
+Error: Channel closed
 ```
 
 ```
-Error: page.fill: Test timeout of 30000ms exceeded.
+Error: page.click: Test ended.
 Call log:
-  - waiting for locator('#password')
+  - waiting for locator('button[type="submit"]')
+    - locator resolved to <button type="submit" class="relative w-full py-4 rounded-xl bg-gradient-primary font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-glow-primary hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 overflow-hidden group">…</button>
+  - attempting click action
+    - waiting for element to be visible, enabled and stable
+    - element is visible, enabled and stable
+    - scrolling into view if needed
+    - done scrolling
 
 ```
 
@@ -34,13 +40,14 @@ Call log:
     - generic [ref=e15]:
       - generic [ref=e16]:
         - text: Email
-        - textbox "Email" [active] [ref=e18]:
+        - textbox "Email" [ref=e18]:
           - /placeholder: seu@email.com
           - text: agente@celx.com.br
       - generic [ref=e19]:
         - text: Senha
-        - textbox "Senha" [ref=e21]:
+        - textbox "Senha" [active] [ref=e21]:
           - /placeholder: ••••••••
+          - text: agente123
       - button "Entrar →" [ref=e22] [cursor=pointer]:
         - generic [ref=e24]:
           - text: Entrar
@@ -94,9 +101,9 @@ Call log:
   13  | async function loginAs(page: Page, user: keyof typeof USERS) {
   14  |   await page.goto(`${BASE_URL}/login`);
   15  |   await page.fill('#email', USERS[user].email);
-> 16  |   await page.fill('#password', USERS[user].password);
-      |              ^ Error: page.fill: Test timeout of 30000ms exceeded.
-  17  |   await page.click('button[type="submit"]');
+  16  |   await page.fill('#password', USERS[user].password);
+> 17  |   await page.click('button[type="submit"]');
+      |              ^ Error: page.click: Test ended.
   18  |   await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
   19  |   await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
   20  | }
@@ -196,4 +203,5 @@ Call log:
   114 |     await page.goto(`${BASE_URL}/dashboard/cliente/tickets/novo`);
   115 |     await expect(page.getByRole('heading', { level: 1, name: 'Criar Novo Ticket' })).toBeVisible();
   116 |     await expect(page.locator('#subject')).toBeVisible();
+  117 |   });
 ```

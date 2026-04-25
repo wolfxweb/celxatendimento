@@ -1,7 +1,5 @@
 from datetime import datetime
 from typing import Optional
-import uuid
-
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from sqlalchemy import select, and_, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -963,7 +961,7 @@ async def create_ticket_relation(
 
     # Get related ticket
     rel_result = await db.execute(
-        select(Ticket).where(Ticket.id == uuid.UUID(related_ticket_id))
+        select(Ticket).where(Ticket.id == int(related_ticket_id))
     )
     related_ticket = rel_result.scalar_one_or_none()
 
@@ -980,7 +978,7 @@ async def create_ticket_relation(
         select(TicketRelation).where(
             and_(
                 TicketRelation.ticket_id == int(ticket_id),
-                TicketRelation.related_ticket_id == uuid.UUID(related_ticket_id),
+                TicketRelation.related_ticket_id == int(related_ticket_id),
                 TicketRelation.relation_type == relation_type,
             )
         )

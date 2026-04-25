@@ -1,8 +1,6 @@
-import uuid
 from datetime import datetime
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin
@@ -12,8 +10,8 @@ class TicketAIResponse(Base, TimestampMixin):
     __tablename__ = "ticket_ai_response"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    ticket_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("tickets.id"), nullable=False
+    ticket_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tickets.id"), nullable=False
     )
 
     # AI generated response
@@ -37,8 +35,8 @@ class TicketAIResponse(Base, TimestampMixin):
     )  # pending, approved, rejected, edited
 
     # Reviewer
-    reviewed_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=True
+    reviewed_by: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True
     )
     reviewed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=True

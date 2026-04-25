@@ -12,63 +12,14 @@
 # Error details
 
 ```
-TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
-=========================== logs ===========================
-waiting for navigation until "load"
-============================================================
+Test timeout of 30000ms exceeded while running "beforeEach" hook.
 ```
 
-# Page snapshot
+```
+Error: page.goto: Test timeout of 30000ms exceeded.
+Call log:
+  - navigating to "http://localhost:3000/", waiting until "load"
 
-```yaml
-- generic [active] [ref=e1]:
-  - generic [ref=e8]:
-    - generic [ref=e9]:
-      - generic [ref=e11]: C
-      - heading "celx-atendimento" [level=1] [ref=e12]
-      - paragraph [ref=e13]: Sistema de tickets com IA
-    - generic [ref=e15]:
-      - generic [ref=e16]:
-        - text: Email
-        - textbox "Email" [ref=e18]:
-          - /placeholder: seu@email.com
-          - text: agente@celx.com.br
-      - generic [ref=e19]:
-        - text: Senha
-        - textbox "Senha" [ref=e21]:
-          - /placeholder: ••••••••
-          - text: agente123
-      - button "Entrando..." [disabled] [ref=e22]:
-        - generic [ref=e24]: Entrando...
-    - generic [ref=e28]:
-      - paragraph [ref=e29]: 👆 Clique para preencher automaticamente
-      - generic [ref=e30]:
-        - button "👑 Super Admin superadmin@celx.com.br admin123" [ref=e31] [cursor=pointer]:
-          - generic [ref=e32]: 👑
-          - generic [ref=e33]:
-            - generic [ref=e34]: Super Admin
-            - generic [ref=e35]: superadmin@celx.com.br
-          - generic [ref=e36]: admin123
-        - button "⚡ Admin admin@celx.com.br admin123" [ref=e37] [cursor=pointer]:
-          - generic [ref=e38]: ⚡
-          - generic [ref=e39]:
-            - generic [ref=e40]: Admin
-            - generic [ref=e41]: admin@celx.com.br
-          - generic [ref=e42]: admin123
-        - button "👨‍💻 Atendente agente@celx.com.br agente123" [ref=e43] [cursor=pointer]:
-          - generic [ref=e44]: 👨‍💻
-          - generic [ref=e45]:
-            - generic [ref=e46]: Atendente
-            - generic [ref=e47]: agente@celx.com.br
-          - generic [ref=e48]: agente123
-        - button "👤 Cliente cliente@celx.com.br cliente123" [ref=e49] [cursor=pointer]:
-          - generic [ref=e50]: 👤
-          - generic [ref=e51]:
-            - generic [ref=e52]: Cliente
-            - generic [ref=e53]: cliente@celx.com.br
-          - generic [ref=e54]: cliente123
-    - paragraph [ref=e55]: Sistema de atendimento com inteligência artificial
-  - alert [ref=e56]
 ```
 
 # Test source
@@ -91,8 +42,7 @@ waiting for navigation until "load"
   15  |   await page.fill('#email', USERS[user].email);
   16  |   await page.fill('#password', USERS[user].password);
   17  |   await page.click('button[type="submit"]');
-> 18  |   await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
-      |              ^ TimeoutError: page.waitForURL: Timeout 10000ms exceeded.
+  18  |   await page.waitForURL(/\/dashboard$/, { timeout: 10000 });
   19  |   await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
   20  | }
   21  | 
@@ -134,7 +84,8 @@ waiting for navigation until "load"
   57  | 
   58  | test.describe('Authentication', () => {
   59  |   test.beforeEach(async ({ page }) => {
-  60  |     await page.goto(BASE_URL);
+> 60  |     await page.goto(BASE_URL);
+      |                ^ Error: page.goto: Test timeout of 30000ms exceeded.
   61  |     await page.evaluate(() => localStorage.clear());
   62  |   });
   63  | 
@@ -193,4 +144,46 @@ waiting for navigation until "load"
   116 |     await expect(page.locator('#subject')).toBeVisible();
   117 |   });
   118 | 
+  119 |   test('TICK-E2E-004: Create ticket - success', async ({ page }) => {
+  120 |     await page.goto(`${BASE_URL}/dashboard/cliente/tickets/novo`);
+  121 |     page.once('dialog', (dialog) => dialog.accept());
+  122 | 
+  123 |     await page.fill('#subject', `Test Ticket Subject E2E ${Date.now()}`);
+  124 |     await page.fill('#description', 'Test ticket description for E2E test');
+  125 |     await page.click('button[type="submit"]');
+  126 | 
+  127 |     await page.waitForURL('**/dashboard/cliente/tickets', { timeout: 10000 });
+  128 |     await expect(page.getByRole('heading', { level: 1, name: 'Meus Tickets' })).toBeVisible();
+  129 |   });
+  130 | });
+  131 | 
+  132 | test.describe('Agent Ticket Management', () => {
+  133 |   test.beforeEach(async ({ page, request }) => {
+  134 |     await createTicketViaApi(request);
+  135 |     await loginAs(page, 'agent');
+  136 |   });
+  137 | 
+  138 |   test('AGT-E2E-001: View all tickets', async ({ page }) => {
+  139 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
+  140 |     await expect(page.getByRole('heading', { level: 1, name: 'Tickets' })).toBeVisible();
+  141 |   });
+  142 | 
+  143 |   test('AGT-E2E-002: Filter tickets by status', async ({ page }) => {
+  144 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
+  145 |     await page.getByRole('button', { name: /abertos/i }).click();
+  146 |     await expect(page.getByRole('button', { name: /abertos/i })).toBeVisible();
+  147 |   });
+  148 | 
+  149 |   test('AGT-E2E-003: Open ticket detail', async ({ page }) => {
+  150 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
+  151 | 
+  152 |     const ticketLink = page.locator('a[href*="/atendente/tickets/"], a[href*="/dashboard/atendente/tickets/"]').first();
+  153 |     await expect(ticketLink).toBeVisible({ timeout: 10000 });
+  154 |     await ticketLink.click();
+  155 | 
+  156 |     await expect(page.getByText(/cliente:/i)).toBeVisible({ timeout: 10000 });
+  157 |   });
+  158 | 
+  159 |   test('AGT-E2E-005: Send customer message', async ({ page }) => {
+  160 |     await page.goto(`${BASE_URL}/dashboard/atendente/tickets`);
 ```

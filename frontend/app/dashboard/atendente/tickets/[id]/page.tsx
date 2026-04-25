@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { apiFetch, apiPost } from '@/lib/api'
+import { apiFetch, apiPatch, apiPost } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 
 interface Message {
@@ -147,7 +147,7 @@ export default function AtendenteTicketDetailPage() {
 
   async function handleChangeStatus(newStatus: string) {
     try {
-      await apiPost(`/tickets/${ticketId}`, {
+      await apiPatch(`/tickets/${ticketId}`, {
         status: newStatus,
       })
       loadTicket()
