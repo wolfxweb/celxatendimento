@@ -19,6 +19,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/atendente/tickets', label: 'Tickets', icon: '📋', roles: ['admin', 'agent'] },
   { href: '/dashboard/atendente/aprovacao', label: 'Aprovar IA', icon: '🤖', badge: true, roles: ['admin', 'agent'] },
   { href: '/dashboard/admin/usuarios', label: 'Usuários', icon: '👥', roles: ['admin'] },
+  { href: '/dashboard/admin/categorias', label: 'Categorias', icon: '📁', roles: ['admin'] },
   { href: '/dashboard/admin/config-ia', label: 'Config IA', icon: '⚙️', roles: ['admin'] },
   { href: '/dashboard/admin/conhecimento', label: 'Conhecimento', icon: '📚', roles: ['admin'] },
   { href: '/dashboard/superadmin/empresas', label: 'Empresas', icon: '🏢', roles: ['superadmin'] },

@@ -1,28 +1,75 @@
 from typing import Optional, List
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, and_
+from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy import select, and_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_active_user
 from app.database import get_db
 from app.models.category import Category
 from app.models.user import User
-from app.schemas.ticket import CategoryCreate, CategoryResponse
+from app.models.ticket import Ticket
+from app.schemas.ticket import (
+    CategoryCreate,
+    CategoryResponse,
+    CategoryUpdate,
+    CategoryActiveResponse,
+    CategoryWithCountResponse,
+)
+
 
 router = APIRouter(prefix="/categories", tags=["categories"])
 
 
-@router.get("/", response_model=List[CategoryResponse])
-async def list_categories(
-    include_inactive: bool = False,
+@router.get("/active", response_model=dict)
+async def list_active_categories(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """List all categories for the user's company"""
+    """
+    List active categories for the user's company.
+    Optimized response for dropdown/combo selection.
+    Returns only id and name.
+    """
+    company_id = current_user.company_id
+    if not company_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User must belong to a company",
+        )
 
-    # Get company ID from user
+    query = (
+        select(Category)
+        .where(
+            and_(
+                Category.company_id == company_id,
+                Category.is_active == True,
+            )
+        )
+        .order_by(Category.name)
+    )
+
+    result = await db.execute(query)
+    categories = result.scalars().all()
+
+    return {
+        "categories": [
+            CategoryActiveResponse(id=cat.id, name=cat.name)
+            for cat in categories
+        ]
+    }
+
+
+@router.get("/", response_model=List[CategoryWithCountResponse])
+async def list_categories(
+    include_inactive: bool = Query(False, description="Include inactive categories"),
+    include_stats: bool = Query(False, description="Include ticket count"),
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """List all categories for the user's company with optional stats"""
+
     company_id = current_user.company_id
     if not company_id:
         raise HTTPException(
@@ -40,23 +87,34 @@ async def list_categories(
     result = await db.execute(query)
     categories = result.scalars().all()
 
-    return [
-        CategoryResponse(
-            id=cat.id,
-            company_id=cat.company_id,
-            name=cat.name,
-            description=cat.description,
-            sla_minutes=cat.sla_minutes,
-            icon=cat.icon,
-            color=cat.color,
-            is_active=cat.is_active,
-            is_default=cat.is_default,
-            require_approval=cat.require_approval,
-            parent_category_id=cat.parent_category_id,
-            created_at=cat.created_at,
+    response = []
+    for cat in categories:
+        ticket_count = 0
+        if include_stats:
+            count_result = await db.execute(
+                select(func.count(Ticket.id)).where(Ticket.category_id == cat.id)
+            )
+            ticket_count = count_result.scalar() or 0
+
+        response.append(
+            CategoryWithCountResponse(
+                id=cat.id,
+                company_id=cat.company_id,
+                name=cat.name,
+                description=cat.description,
+                sla_minutes=cat.sla_minutes,
+                icon=cat.icon,
+                color=cat.color,
+                is_active=cat.is_active,
+                is_default=cat.is_default,
+                require_approval=cat.require_approval,
+                parent_category_id=cat.parent_category_id,
+                ticket_count=ticket_count,
+                created_at=cat.created_at,
+            )
         )
-        for cat in categories
-    ]
+
+    return response
 
 
 @router.post("/", response_model=CategoryResponse, status_code=status.HTTP_201_CREATED)
@@ -81,12 +139,12 @@ async def create_category(
             detail="User must belong to a company",
         )
 
-    # Check if category name already exists
+    # Check if category name already exists (case-insensitive)
     result = await db.execute(
         select(Category).where(
             and_(
                 Category.company_id == company_id,
-                Category.name == category_data.name,
+                func.lower(Category.name) == func.lower(category_data.name),
             )
         )
     )
@@ -94,7 +152,7 @@ async def create_category(
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Category with this name already exists",
+            detail="Categoria já existe",
         )
 
     category = Category(
@@ -104,6 +162,7 @@ async def create_category(
         sla_minutes=category_data.sla_minutes,
         icon=category_data.icon,
         color=category_data.color,
+        require_approval=category_data.require_approval,
     )
 
     db.add(category)
@@ -126,14 +185,12 @@ async def create_category(
     )
 
 
-@router.get("/{category_id}", response_model=CategoryResponse)
-async def get_category(
+async def _get_category_or_404(
     category_id: int,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_active_user),
-):
-    """Get a specific category"""
-
+    db: AsyncSession,
+    current_user: User,
+) -> Category:
+    """Helper to get category with company validation"""
     result = await db.execute(select(Category).where(Category.id == category_id))
     category = result.scalar_one_or_none()
 
@@ -143,12 +200,34 @@ async def get_category(
             detail="Category not found",
         )
 
-    # Check company access
     if category.company_id != current_user.company_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Access denied",
         )
+
+    return category
+
+
+async def _check_category_in_use(category_id: int, db: AsyncSession) -> int:
+    """Check how many tickets are using this category. Returns ticket count."""
+    from sqlalchemy import select, func
+    from app.models.ticket import Ticket
+
+    count_result = await db.execute(
+        select(func.count(Ticket.id)).where(Ticket.category_id == category_id)
+    )
+    return count_result.scalar() or 0
+
+
+@router.get("/{category_id}", response_model=CategoryResponse)
+async def get_category(
+    category_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Get a specific category"""
+    category = await _get_category_or_404(category_id, db, current_user)
 
     return CategoryResponse(
         id=category.id,
@@ -169,7 +248,7 @@ async def get_category(
 @router.patch("/{category_id}", response_model=CategoryResponse)
 async def update_category(
     category_id: int,
-    category_data: dict,
+    category_data: CategoryUpdate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -182,24 +261,37 @@ async def update_category(
             detail="Only admins can update categories",
         )
 
-    result = await db.execute(select(Category).where(Category.id == category_id))
-    category = result.scalar_one_or_none()
+    category = await _get_category_or_404(category_id, db, current_user)
 
-    if not category:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
+    # Check for duplicate name (case-insensitive) if name is being changed
+    if category_data.name and category_data.name.lower() != category.name.lower():
+        existing = await db.execute(
+            select(Category).where(
+                and_(
+                    Category.company_id == current_user.company_id,
+                    Category.id != category_id,
+                    func.lower(Category.name) == func.lower(category_data.name),
+                )
+            )
         )
+        if existing.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Categoria já existe",
+            )
 
-    # Check company access
-    if category.company_id != current_user.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
-        )
+    # If trying to deactivate, check if category is in use
+    if category_data.is_active is False and category.is_active is True:
+        ticket_count = await _check_category_in_use(category_id, db)
+        if ticket_count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Categoria está em uso por {ticket_count} tickets",
+            )
 
-    # Update fields
-    for key, value in category_data.items():
+    # Update fields that were provided
+    update_data = category_data.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
         if hasattr(category, key):
             setattr(category, key, value)
 
@@ -228,7 +320,7 @@ async def delete_category(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Delete a category (soft delete)"""
+    """Delete a category (soft delete - marks as inactive)"""
 
     # Only admins can delete categories
     if current_user.role not in ["admin", "superadmin"]:
@@ -237,25 +329,17 @@ async def delete_category(
             detail="Only admins can delete categories",
         )
 
-    result = await db.execute(select(Category).where(Category.id == category_id))
-    category = result.scalar_one_or_none()
+    category = await _get_category_or_404(category_id, db, current_user)
 
-    if not category:
+    # Check if category is in use
+    ticket_count = await _check_category_in_use(category_id, db)
+    if ticket_count > 0:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Category not found",
-        )
-
-    # Check company access
-    if category.company_id != current_user.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied",
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Categoria está em uso por {ticket_count} tickets",
         )
 
     # Soft delete
-    from datetime import datetime
-
     category.is_active = False
 
     await db.commit()

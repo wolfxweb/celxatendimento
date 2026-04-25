@@ -39,6 +39,7 @@ async def login(
             "email": user.email,
             "role": user.role,
             "full_name": user.full_name or user.email.split("@")[0],
+            "company_id": user.company_id,
         }
     )
     return Token(access_token=access_token)

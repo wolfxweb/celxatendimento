@@ -6,8 +6,8 @@
 
 # Test info
 
-- Name: e2e.spec.ts >> Authentication >> AUTH-E2E-005: Login with wrong password shows error
-- Location: frontend/tests/e2e.spec.ts:80:7
+- Name: e2e.spec.ts >> Authentication >> AUTH-E2E-006: Logout and redirect to login
+- Location: frontend/tests/e2e.spec.ts:88:7
 
 # Error details
 
@@ -16,72 +16,162 @@ Test timeout of 30000ms exceeded.
 ```
 
 ```
-Error: page.click: Test timeout of 30000ms exceeded.
+Error: locator.click: Test timeout of 30000ms exceeded.
 Call log:
-  - waiting for locator('button[type="submit"]')
-    - locator resolved to <button type="submit" class="relative w-full py-4 rounded-xl bg-gradient-primary font-semibold text-white shadow-lg transition-all duration-300 hover:shadow-glow-primary hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 overflow-hidden group">…</button>
+  - waiting for getByRole('link', { name: /sair/i })
+    - locator resolved to <a href="/login" class="mt-3 flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-slate-700/50 text-slate-300 hover:text-white hover:bg-red-500/20 hover:text-red-400 transition-all duration-200 text-sm">…</a>
   - attempting click action
-    - waiting for element to be visible, enabled and stable
-    - element is visible, enabled and stable
-    - scrolling into view if needed
-    - done scrolling
-    - performing click action
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <aside class="fixed top-0 left-0 h-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 z-50 transition-all duration-300 w-64">…</aside> intercepts pointer events
+    - retrying click action
+    - waiting 20ms
+    2 × waiting for element to be visible, enabled and stable
+      - element is visible, enabled and stable
+      - scrolling into view if needed
+      - done scrolling
+      - <aside class="fixed top-0 left-0 h-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 z-50 transition-all duration-300 w-64">…</aside> intercepts pointer events
+    - retrying click action
+      - waiting 100ms
+    45 × waiting for element to be visible, enabled and stable
+       - element is visible, enabled and stable
+       - scrolling into view if needed
+       - done scrolling
+       - <aside class="fixed top-0 left-0 h-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 z-50 transition-all duration-300 w-64">…</aside> intercepts pointer events
+     - retrying click action
+       - waiting 500ms
 
 ```
 
 # Page snapshot
 
 ```yaml
-- generic [ref=e1]:
-  - generic [ref=e8]:
-    - generic [ref=e9]:
-      - generic [ref=e11]: C
-      - heading "celx-atendimento" [level=1] [ref=e12]
-      - paragraph [ref=e13]: Sistema de tickets com IA
-    - generic [ref=e15]:
-      - generic [ref=e16]:
-        - text: Email
-        - textbox "Email" [ref=e18]:
-          - /placeholder: seu@email.com
-          - text: admin@celx.com.br
-      - generic [ref=e19]:
-        - text: Senha
-        - textbox "Senha" [active] [ref=e21]:
-          - /placeholder: ••••••••
-          - text: wrongpassword
-      - button "Entrar →" [ref=e22] [cursor=pointer]:
-        - generic [ref=e24]:
-          - text: Entrar
-          - generic [ref=e25]: →
-    - generic [ref=e28]:
-      - paragraph [ref=e29]: 👆 Clique para preencher automaticamente
-      - generic [ref=e30]:
-        - button "👑 Super Admin superadmin@celx.com.br admin123" [ref=e31] [cursor=pointer]:
-          - generic [ref=e32]: 👑
-          - generic [ref=e33]:
-            - generic [ref=e34]: Super Admin
-            - generic [ref=e35]: superadmin@celx.com.br
-          - generic [ref=e36]: admin123
-        - button "⚡ Admin admin@celx.com.br admin123" [ref=e37] [cursor=pointer]:
-          - generic [ref=e38]: ⚡
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - complementary [ref=e3]:
+      - generic [ref=e5]:
+        - generic [ref=e7]: C
+        - generic [ref=e8]: celx-atendimento
+      - button [ref=e9] [cursor=pointer]:
+        - img [ref=e10]
+      - navigation [ref=e12]:
+        - link "🏠 Dashboard" [ref=e13] [cursor=pointer]:
+          - /url: /dashboard
+          - generic [ref=e14]: 🏠
+          - generic [ref=e15]: Dashboard
+        - link "🎫 Meus Tickets" [ref=e16] [cursor=pointer]:
+          - /url: /dashboard/cliente/tickets
+          - generic [ref=e17]: 🎫
+          - generic [ref=e18]: Meus Tickets
+        - link "📋 Tickets" [ref=e19] [cursor=pointer]:
+          - /url: /dashboard/atendente/tickets
+          - generic [ref=e20]: 📋
+          - generic [ref=e21]: Tickets
+        - link "🤖 Aprovar IA NEW" [ref=e22] [cursor=pointer]:
+          - /url: /dashboard/atendente/aprovacao
+          - generic [ref=e23]: 🤖
+          - generic [ref=e24]: Aprovar IA
+          - generic [ref=e25]: NEW
+        - link "👥 Usuários" [ref=e26] [cursor=pointer]:
+          - /url: /dashboard/admin/usuarios
+          - generic [ref=e27]: 👥
+          - generic [ref=e28]: Usuários
+        - link "⚙️ Config IA" [ref=e29] [cursor=pointer]:
+          - /url: /dashboard/admin/config-ia
+          - generic [ref=e30]: ⚙️
+          - generic [ref=e31]: Config IA
+        - link "📚 Conhecimento" [ref=e32] [cursor=pointer]:
+          - /url: /dashboard/admin/conhecimento
+          - generic [ref=e33]: 📚
+          - generic [ref=e34]: Conhecimento
+      - generic [ref=e35]:
+        - generic [ref=e36]:
+          - generic [ref=e38]: A
           - generic [ref=e39]:
-            - generic [ref=e40]: Admin
-            - generic [ref=e41]: admin@celx.com.br
-          - generic [ref=e42]: admin123
-        - button "👨‍💻 Atendente agente@celx.com.br agente123" [ref=e43] [cursor=pointer]:
-          - generic [ref=e44]: 👨‍💻
-          - generic [ref=e45]:
-            - generic [ref=e46]: Atendente
-            - generic [ref=e47]: agente@celx.com.br
-          - generic [ref=e48]: agente123
-        - button "👤 Cliente cliente@celx.com.br cliente123" [ref=e49] [cursor=pointer]:
-          - generic [ref=e50]: 👤
-          - generic [ref=e51]:
-            - generic [ref=e52]: Cliente
-            - generic [ref=e53]: cliente@celx.com.br
-          - generic [ref=e54]: cliente123
-    - paragraph [ref=e55]: Sistema de atendimento com inteligência artificial
-  - alert [ref=e56]
+            - paragraph [ref=e40]: Administrador
+            - paragraph [ref=e41]: admin@celx.com.br
+        - link "⬆ Sair" [ref=e42] [cursor=pointer]:
+          - /url: /login
+          - generic [ref=e43]: ⬆
+          - text: Sair
+    - generic [ref=e44]:
+      - banner [ref=e45]:
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - heading "Olá, Administrador 👋" [level=2] [ref=e48]
+            - paragraph [ref=e49]: sábado, 25 de abril
+          - generic [ref=e50]:
+            - generic [ref=e51]: admin
+            - button "🔔" [ref=e52] [cursor=pointer]: 🔔
+      - main [ref=e54]:
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - heading "Dashboard" [level=1] [ref=e58]
+            - paragraph [ref=e59]: Gerencie suas atividades e tickets
+          - generic [ref=e62]:
+            - link "🎫 Meus Tickets Visualize e crie tickets de suporte Acessar →" [ref=e63] [cursor=pointer]:
+              - /url: /dashboard/cliente/tickets
+              - generic [ref=e66]:
+                - generic [ref=e67]: 🎫
+                - heading "Meus Tickets" [level=2] [ref=e68]
+                - paragraph [ref=e69]: Visualize e crie tickets de suporte
+                - generic [ref=e70]:
+                  - generic [ref=e71]: Acessar
+                  - generic [ref=e72]: →
+            - link "📋 Tickets Gerencie tickets da empresa Acessar →" [ref=e74] [cursor=pointer]:
+              - /url: /dashboard/atendente/tickets
+              - generic [ref=e77]:
+                - generic [ref=e78]: 📋
+                - heading "Tickets" [level=2] [ref=e79]
+                - paragraph [ref=e80]: Gerencie tickets da empresa
+                - generic [ref=e81]:
+                  - generic [ref=e82]: Acessar
+                  - generic [ref=e83]: →
+            - link "🤖 Pendente Aprovar IA Revise respostas geradas por IA Acessar →" [ref=e85] [cursor=pointer]:
+              - /url: /dashboard/atendente/aprovacao
+              - generic [ref=e88]:
+                - generic [ref=e89]: 🤖
+                - generic [ref=e90]: Pendente
+                - heading "Aprovar IA" [level=2] [ref=e91]
+                - paragraph [ref=e92]: Revise respostas geradas por IA
+                - generic [ref=e93]:
+                  - generic [ref=e94]: Acessar
+                  - generic [ref=e95]: →
+          - generic [ref=e97]:
+            - generic [ref=e98]:
+              - generic [ref=e99]:
+                - heading "Atividade Recente" [level=3] [ref=e100]
+                - generic [ref=e102]: 📊
+              - generic [ref=e103]:
+                - generic [ref=e104]:
+                  - generic [ref=e105]: "Ticket #123 resolvido com sucesso"
+                  - generic [ref=e106]: 2h atrás
+                - generic [ref=e107]:
+                  - generic [ref=e108]: Nova resposta IA pendente
+                  - generic [ref=e109]: 4h atrás
+                - generic [ref=e110]:
+                  - generic [ref=e111]: "Ticket #122 atribuído a você"
+                  - generic [ref=e112]: 1d atrás
+            - generic [ref=e116]:
+              - generic [ref=e117]:
+                - heading "Estatísticas" [level=3] [ref=e118]
+                - generic [ref=e120]: ⚡
+              - generic [ref=e121]:
+                - generic [ref=e122]:
+                  - generic: "12"
+                  - generic: Tickets Abertos
+                - generic [ref=e123]:
+                  - generic: "8"
+                  - generic: Resolvidos Hoje
+                - generic [ref=e124]:
+                  - generic: "3"
+                  - generic: Aguardando IA
+                - generic [ref=e125]:
+                  - generic: 98%
+                  - generic: Satisfação
+  - alert [ref=e126]
 ```
 
 # Test source
@@ -170,14 +260,14 @@ Call log:
   81  |     await page.goto(`${BASE_URL}/login`);
   82  |     await page.fill('#email', USERS.admin.email);
   83  |     await page.fill('#password', 'wrongpassword');
-> 84  |     await page.click('button[type="submit"]');
-      |                ^ Error: page.click: Test timeout of 30000ms exceeded.
+  84  |     await page.click('button[type="submit"]');
   85  |     await expect(page.getByText('Email ou senha incorretos')).toBeVisible({ timeout: 5000 });
   86  |   });
   87  | 
   88  |   test('AUTH-E2E-006: Logout and redirect to login', async ({ page }) => {
   89  |     await loginAs(page, 'admin');
-  90  |     await page.getByRole('link', { name: /sair/i }).click();
+> 90  |     await page.getByRole('link', { name: /sair/i }).click();
+      |                                                     ^ Error: locator.click: Test timeout of 30000ms exceeded.
   91  |     await page.waitForURL('**/login', { timeout: 10000 });
   92  |     await expect(page.locator('#email')).toBeVisible();
   93  |   });
@@ -272,4 +362,10 @@ Call log:
   182 | });
   183 | 
   184 | test.describe('Admin User Management', () => {
+  185 |   test.beforeEach(async ({ page }) => {
+  186 |     await loginAs(page, 'admin');
+  187 |   });
+  188 | 
+  189 |   test('USER-E2E-001: View user list', async ({ page }) => {
+  190 |     await page.goto(`${BASE_URL}/dashboard/admin/usuarios`);
 ```

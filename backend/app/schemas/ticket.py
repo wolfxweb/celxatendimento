@@ -146,6 +146,7 @@ class CategoryBase(BaseModel):
     sla_minutes: int = 1440
     icon: Optional[str] = None
     color: Optional[str] = None
+    require_approval: bool = False
 
 
 class CategoryCreate(CategoryBase):
@@ -163,3 +164,82 @@ class CategoryResponse(CategoryBase):
 
     class Config:
         from_attributes = True
+
+
+class CategoryActiveResponse(BaseModel):
+    """Schema minimal para combo de seleção"""
+    id: int
+    name: str
+
+
+class CategoryListResponse(BaseModel):
+    """Schema para listagem admin com contagem de tickets"""
+    id: int
+    name: str
+    description: Optional[str] = None
+    sla_minutes: int = 1440
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    is_active: bool
+    is_default: bool
+    require_approval: bool
+    ticket_count: int = 0
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CategoryUpdate(BaseModel):
+    """Schema para atualização de categoria"""
+    name: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = None
+    sla_minutes: Optional[int] = Field(None, ge=1)
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    require_approval: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+class CategoryWithCountResponse(BaseModel):
+    """Response com categoria e contagem de tickets"""
+    id: int
+    company_id: int
+    name: str
+    description: Optional[str] = None
+    sla_minutes: int
+    icon: Optional[str] = None
+    color: Optional[str] = None
+    is_active: bool
+    is_default: bool
+    require_approval: bool
+    parent_category_id: Optional[int] = None
+    ticket_count: int = 0
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Attachment schemas
+class AttachmentResponse(BaseModel):
+    id: int
+    filename: str
+    file_size: int
+    mime_type: str
+
+
+class AttachmentListResponse(BaseModel):
+    id: int
+    filename: str
+    file_size: int
+    mime_type: str
+    uploaded_by: Optional[dict] = None  # {"id": 1, "name": "João Silva"}
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AttachmentsUploadResponse(BaseModel):
+    attachments: list[AttachmentResponse]

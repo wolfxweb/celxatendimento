@@ -1,15 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import { apiFetch, apiPost } from '@/lib/api'
+import { apiFetch, apiPost, apiUpload } from '@/lib/api'
 
-interface Category {
+interface CategoryActive {
   id: number
   name: string
-  description: string | null
-  icon: string | null
-  color: string | null
+}
+
+interface FileAttachment {
+  id: string
+  file: File
+  preview?: string
 }
 
 interface TicketCreateResponse {
@@ -25,16 +28,25 @@ const PRIORITIES = [
   { value: 'critical', label: 'Crítica', color: 'red', icon: '🔴' },
 ]
 
+const ALLOWED_FILE_TYPES = [
+  '.jpg', '.jpeg', '.png', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.zip'
+]
+
+const MAX_FILE_SIZE_MB = 10
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
+
 export default function NovoTicketPage() {
   const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [loading, setLoading] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
+  const [categories, setCategories] = useState<CategoryActive[]>([])
   const [error, setError] = useState('')
-  
+
   const [subject, setSubject] = useState('')
   const [description, setDescription] = useState('')
   const [categoryId, setCategoryId] = useState<number | ''>('')
   const [priority, setPriority] = useState('medium')
+  const [attachments, setAttachments] = useState<FileAttachment[]>([])
 
   useEffect(() => {
     loadCategories()
@@ -42,10 +54,80 @@ export default function NovoTicketPage() {
 
   async function loadCategories() {
     try {
-      const data = await apiFetch<Category[]>('/categories')
-      setCategories(data)
+      const data = await apiFetch<{ categories: CategoryActive[] }>('/categories/active')
+      setCategories(data.categories)
     } catch (err) {
       console.error('Erro ao carregar categorias')
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files) return
+
+    const newAttachments: FileAttachment[] = []
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+
+      // Validate extension
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+      if (!ALLOWED_FILE_TYPES.includes(ext)) {
+        alert(`Arquivo ${file.name}: extensão ${ext} não permitida`)
+        continue
+      }
+
+      // Validate size
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        alert(`Arquivo ${file.name}: excede limite de ${MAX_FILE_SIZE_MB}MB`)
+        continue
+      }
+
+      newAttachments.push({
+        id: Math.random().toString(36).substring(7),
+        file,
+        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+      })
+    }
+
+    setAttachments(prev => [...prev, ...newAttachments])
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments(prev => {
+      const att = prev.find(a => a.id === id)
+      if (att?.preview) {
+        URL.revokeObjectURL(att.preview)
+      }
+      return prev.filter(a => a.id !== id)
+    })
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  }
+
+  function getFileIcon(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase()
+    switch (ext) {
+      case 'pdf': return '📄'
+      case 'doc':
+      case 'docx': return '📝'
+      case 'xls':
+      case 'xlsx': return '📊'
+      case 'jpg':
+      case 'jpeg':
+      case 'png': return '🖼️'
+      case 'zip': return '📦'
+      case 'txt': return '📃'
+      default: return '📎'
     }
   }
 
@@ -55,15 +137,31 @@ export default function NovoTicketPage() {
     setLoading(true)
 
     try {
+      // First create the ticket
       const ticketData = {
         subject,
         description,
         category_id: categoryId || null,
         priority,
       }
-      
+
       const result = await apiPost<TicketCreateResponse>('/tickets', ticketData)
-      
+
+      // If there are attachments, upload them
+      if (attachments.length > 0) {
+        const formData = new FormData()
+        attachments.forEach(att => {
+          formData.append('files', att.file)
+        })
+
+        try {
+          await apiUpload(`/tickets/${result.id}/attachments`, formData)
+        } catch (uploadErr) {
+          console.error('Erro ao upload anexos:', uploadErr)
+          // Continue anyway - ticket was created
+        }
+      }
+
       alert(`Ticket ${result.ticket_number} criado com sucesso!`)
       router.push('/dashboard/cliente/tickets')
     } catch (err) {
@@ -143,9 +241,7 @@ export default function NovoTicketPage() {
             >
               <option value="">Selecione uma categoria (opcional)</option>
               {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.icon ? `${cat.icon} ` : ''}{cat.name}
-                </option>
+                <option key={cat.id} value={cat.id}>{cat.name}</option>
               ))}
             </select>
           </div>
@@ -188,6 +284,61 @@ export default function NovoTicketPage() {
                 </label>
               ))}
             </div>
+          </div>
+
+          {/* Attachments */}
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-slate-700">
+              Anexos <span className="text-slate-400 font-normal">(opcional)</span>
+            </label>
+
+            {/* File list */}
+            {attachments.length > 0 && (
+              <div className="space-y-2 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                {attachments.map((att) => (
+                  <div key={att.id} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-100">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {att.preview ? (
+                        <img src={att.preview} alt="" className="w-10 h-10 object-cover rounded" />
+                      ) : (
+                        <span className="text-xl">{getFileIcon(att.file.name)}</span>
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-700 truncate">{att.file.name}</p>
+                        <p className="text-xs text-slate-400">{formatFileSize(att.file.size)}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(att.id)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Upload button */}
+            <div
+              className="flex items-center justify-center gap-3 p-4 rounded-xl border-2 border-dashed border-slate-200 hover:border-primary-400 hover:bg-primary-50/50 transition-all cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <span className="text-xl">📎</span>
+              <span className="text-sm text-slate-500">Adicionar arquivos</span>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept={ALLOWED_FILE_TYPES.join(',')}
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
+            <p className="text-xs text-slate-400">
+              Máx. {MAX_FILE_SIZE_MB}MB por arquivo • jpg, png, pdf, doc, docx, xls, xlsx, txt, zip
+            </p>
           </div>
 
           {/* Submit Buttons */}

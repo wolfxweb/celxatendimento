@@ -1,9 +1,24 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import { apiFetch, apiPost } from '@/lib/api'
+import { apiFetch, apiPost, apiUpload } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
+
+interface Attachment {
+  id: number
+  filename: string
+  file_size: number
+  mime_type: string
+  uploaded_by: { id: number; name: string } | null
+  created_at: string
+}
+
+interface FilePreview {
+  id: string
+  file: File
+  preview?: string
+}
 
 interface Message {
   id: number
@@ -117,15 +132,22 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   rating_added: 'Avaliação adicionada',
 }
 
-type TabType = 'mensagens' | 'relacionados' | 'alteracoes'
+type TabType = 'mensagens' | 'relacionados' | 'alteracoes' | 'anexos'
+
+const ALLOWED_FILE_TYPES = ['.jpg', '.jpeg', '.png', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.zip']
+const MAX_FILE_SIZE_MB = 10
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 export default function TicketDetailPage() {
   const params = useParams()
   const ticketId = params.id as string
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [ticket, setTicket] = useState<TicketDetail | null>(null)
   const [relations, setRelations] = useState<TicketRelation[]>([])
   const [auditLog, setAuditLog] = useState<AuditLog[]>([])
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [pendingFiles, setPendingFiles] = useState<FilePreview[]>([])
   const [activeTab, setActiveTab] = useState<TabType>('mensagens')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -147,6 +169,15 @@ export default function TicketDetailPage() {
       setError('Erro ao carregar ticket')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadAttachments() {
+    try {
+      const data = await apiFetch<{ attachments: Attachment[] }>(`/tickets/${ticketId}/attachments`)
+      setAttachments(data.attachments)
+    } catch (err) {
+      console.error('Erro ao carregar anexos:', err)
     }
   }
 
@@ -174,21 +205,89 @@ export default function TicketDetailPage() {
       loadRelations()
     } else if (tab === 'alteracoes' && auditLog.length === 0) {
       loadAuditLog()
+    } else if (tab === 'mensagens' && attachments.length === 0) {
+      loadAttachments()
+    }
+  }
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files
+    if (!files) return
+
+    const newFiles: FilePreview[] = []
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+      if (!ALLOWED_FILE_TYPES.includes(ext)) {
+        alert(`Arquivo ${file.name}: extensão ${ext} não permitida`)
+        continue
+      }
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        alert(`Arquivo ${file.name}: excede limite de ${MAX_FILE_SIZE_MB}MB`)
+        continue
+      }
+      newFiles.push({
+        id: Math.random().toString(36).substring(7),
+        file,
+        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+      })
+    }
+    setPendingFiles(prev => [...prev, ...newFiles])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function removePendingFile(id: string) {
+    setPendingFiles(prev => {
+      const f = prev.find(x => x.id === id)
+      if (f?.preview) URL.revokeObjectURL(f.preview)
+      return prev.filter(x => x.id !== id)
+    })
+  }
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return bytes + ' B'
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB'
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB'
+  }
+
+  function getFileIcon(filename: string): string {
+    const ext = filename.split('.').pop()?.toLowerCase()
+    switch (ext) {
+      case 'pdf': return '📄'
+      case 'doc': case 'docx': return '📝'
+      case 'xls': case 'xlsx': return '📊'
+      case 'jpg': case 'jpeg': case 'png': return '🖼️'
+      case 'zip': return '📦'
+      case 'txt': return '📃'
+      default: return '📎'
     }
   }
 
   async function handleSendMessage(e: React.FormEvent) {
     e.preventDefault()
-    if (!newMessage.trim()) return
+    if (!newMessage.trim() && pendingFiles.length === 0) return
 
     setSending(true)
     try {
-      await apiPost(`/tickets/${ticketId}/messages`, {
-        content: newMessage,
-        is_internal: false,
-      })
+      // Upload attachments first if any
+      if (pendingFiles.length > 0) {
+        const formData = new FormData()
+        pendingFiles.forEach(f => formData.append('files', f.file))
+        await apiUpload(`/tickets/${ticketId}/attachments`, formData)
+        setPendingFiles([])
+      }
+
+      // Send message
+      if (newMessage.trim()) {
+        await apiPost(`/tickets/${ticketId}/messages`, {
+          content: newMessage,
+          is_internal: false,
+        })
+      }
+
       setNewMessage('')
       loadTicket()
+      loadAttachments()
     } catch (err) {
       alert('Erro ao enviar mensagem')
     } finally {
@@ -334,7 +433,7 @@ export default function TicketDetailPage() {
       <div className="rounded-2xl bg-white shadow-card-modern border border-slate-100 overflow-hidden">
         <div className="border-b border-slate-100">
           <div className="flex">
-            {(['mensagens', 'relacionados', 'alteracoes'] as TabType[]).map((tab) => (
+            {(['mensagens', 'relacionados', 'alteracoes', 'anexos'] as TabType[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => handleTabChange(tab)}
@@ -344,7 +443,7 @@ export default function TicketDetailPage() {
                     : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'anexos' ? `Anexos (${attachments.length})` : tab.charAt(0).toUpperCase() + tab.slice(1)}
                 {tab === 'mensagens' && ` (${ticket.messages.length})`}
               </button>
             ))}
@@ -526,9 +625,53 @@ export default function TicketDetailPage() {
               rows={4}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all resize-none"
               placeholder="Digite sua mensagem..."
-              required
             />
-            <div className="flex justify-end mt-4">
+
+            {/* Pending attachments preview */}
+            {pendingFiles.length > 0 && (
+              <div className="mt-3 space-y-2 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                {pendingFiles.map(f => (
+                  <div key={f.id} className="flex items-center justify-between p-2 bg-white rounded border border-slate-100">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {f.preview ? (
+                        <img src={f.preview} alt="" className="w-8 h-8 object-cover rounded" />
+                      ) : (
+                        <span className="text-lg">{getFileIcon(f.file.name)}</span>
+                      )}
+                      <span className="text-sm text-slate-600 truncate">{f.file.name}</span>
+                      <span className="text-xs text-slate-400">({formatFileSize(f.file.size)})</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePendingFile(f.id)}
+                      className="p-1 text-slate-400 hover:text-red-500"
+                    >✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between mt-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  multiple
+                  accept={ALLOWED_FILE_TYPES.join(',')}
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm"
+                >
+                  📎 Anexar arquivos
+                </button>
+                {pendingFiles.length > 0 && (
+                  <span className="text-xs text-slate-400">{pendingFiles.length} arquivo(s) pendente(s)</span>
+                )}
+              </div>
               <button
                 type="submit"
                 disabled={sending}
