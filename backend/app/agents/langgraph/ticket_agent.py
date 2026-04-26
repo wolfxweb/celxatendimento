@@ -28,21 +28,17 @@ class AgentState(TypedDict):
     ticket_description: str
     customer_email: str
     priority: str
-
     # RAG context
     rag_sources: list
-
     # AI Response
     generated_response: Optional[str]
     response_confidence: Optional[float]
     processing_time_ms: Optional[int]
-
     # Config
     llm_model: str
     temperature: float
     autonomy_level: str
     system_prompt: str
-
     # Error handling
     error: Optional[str]
     retry_count: int
@@ -300,7 +296,6 @@ async def save_for_manual_approval(state: AgentState) -> AgentState:
         #     },
         #     processing_time_ms=state["processing_time_ms"],
         # )
-
         return state
 
     except Exception as e:
@@ -326,31 +321,27 @@ async def handle_error(state: AgentState) -> AgentState:
 DEFAULT_SYSTEM_PROMPT = """
 
 ## Regras de Comunicação
+    1. **Seja profissional e amigável** - Tratamento respeitoso em todas as interações
+    2. **Seja claro e objetivo** - Respondas diretas, evitando rodeios
+    3. **Use linguagem acessível** - Evite jargões técnicos desnecessários
+    4. **Agradeça o contato** - Demonstre valorização pelo tempo do cliente
 
-1. **Seja profissional e amigável** - Tratamento respeitoso em todas as interações
-2. **Seja claro e objetivo** - Respondas diretas, evitando rodeios
-3. **Use linguagem acessível** - Evite jargões técnicos desnecessários
-4. **Agradeça o contato** - Demonstre valorização pelo tempo do cliente
+    ## Respondendo Tickets
+    1. **Entenda o problema** - Leia atentamente a descrição do ticket
+    2. **Identifique a categoria** - Determine se é dúvida, problema técnico, solicitação, etc.
+    3. **Forneça a solução** - Se souber a resposta, forneça imediatamente
+    4. **Se precisar de informações** - Solicite de forma clara e objetiva
+    5. **Defina próximos passos** - Informe o cliente sobre o que acontece a seguir
 
-## Respondendo Tickets
+    ## Quando Não Souber a Resposta
+    1. Não invente informações
+    2. Informe que vai verificar e retornará
+    3. Se necessário, escalone para um atendente humano
 
-1. **Entenda o problema** - Leia atentamente a descrição do ticket
-2. **Identifique a categoria** - Determine se é dúvida, problema técnico, solicitação, etc.
-3. **Forneça a solução** - Se souber a resposta, forneça imediatamente
-4. **Se precisar de informações** - Solicite de forma clara e objetiva
-5. **Defina próximos passos** - Informe o cliente sobre o que acontece a seguir
-
-## Quando Não Souber a Resposta
-
-1. Não invente informações
-2. Informe que vai verificar e retornará
-3. Se necessário, escalone para um atendente humano
-
-## Informações da Empresa
-
-- Nome da Empresa: {company_name}
-- Suporte: Segunda a Sexta, 9h às 18h
-- Email: suporte@empresa.com
+    ## Informações da Empresa
+    - Nome da Empresa: {company_name}
+    - Suporte: Segunda a Sexta, 9h às 18h
+    - Email: suporte@empresa.com
 """
 
 
