@@ -125,11 +125,11 @@ export default function AdminCategoriasPage() {
     setSaving(true)
     try {
       if (confirmModal.action === 'activate') {
-        await apiPatch(`/categories/${confirmModal.category.id}/`, { is_active: true })
+        await apiPatch(`/categories/${confirmModal.category.id}`, { is_active: true })
       } else if (confirmModal.action === 'inactivate') {
-        await apiPatch(`/categories/${confirmModal.category.id}/`, { is_active: false })
+        await apiPatch(`/categories/${confirmModal.category.id}`, { is_active: false })
       } else if (confirmModal.action === 'delete') {
-        await apiDelete(`/categories/${confirmModal.category.id}/`)
+        await apiDelete(`/categories/${confirmModal.category.id}`)
       }
       setConfirmModal({ isOpen: false, action: null, category: null })
       loadCategories()
