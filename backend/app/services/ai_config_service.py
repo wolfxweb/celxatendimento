@@ -17,14 +17,138 @@ from app.models.ai_tool import AITool
 from app.core.security import encrypt_api_key, decrypt_api_key
 
 
+DEFAULT_LLM_MODELS = [
+    ("openrouter/free", "OpenRouter Free Router (FREE)", 262000, False),
+    ("google/gemma-3n-e4b-it:free", "Gemma 3n 4B (FREE)", 8192, False),
+    ("google/gemma-3-12b-it:free", "Gemma 3 12B (FREE)", 32768, True),
+    ("google/gemma-3-27b-it:free", "Gemma 3 27B (FREE)", 131072, True),
+    ("qwen/qwen3-4b:free", "Qwen3 4B (FREE)", 40960, False),
+    ("qwen/qwen3-coder:free", "Qwen3 Coder 480B A35B (FREE)", 262000, True),
+    ("google/gemini-2.0-flash-exp", "Gemini 2.0 Flash (FREE)", 1000000, True),
+    ("google/gemini-1.5-flash", "Gemini 1.5 Flash (FREE)", 1000000, True),
+    ("google/gemini-1.5-flash-8b", "Gemini 1.5 Flash 8B (FREE)", 1000000, True),
+    ("meta-llama/llama-3.1-8b-instruct", "Llama 3.1 8B (FREE)", 8192, False),
+    ("mistralai/mistral-7b-instruct", "Mistral 7B (FREE)", 32768, False),
+    ("google/gemma-3n-e4b-it", "Gemma 3n 4B (barato)", 32768, False),
+    ("qwen/qwen3-4b", "Qwen3 4B (barato)", 128000, False),
+    ("deepseek/deepseek-chat-v3.1", "DeepSeek V3.1 (barato)", 32768, True),
+    ("deepseek/deepseek-v3.2", "DeepSeek V3.2 (barato)", 163840, True),
+    ("qwen/qwen3-coder", "Qwen3 Coder 480B A35B (barato)", 262144, True),
+    ("openai/gpt-4o-mini", "GPT-4o Mini (baixo custo)", 128000, True),
+    ("openai/gpt-4o", "GPT-4o (premium)", 128000, True),
+    ("anthropic/claude-3.5-sonnet", "Claude 3.5 Sonnet (premium)", 200000, True),
+    ("anthropic/claude-3-haiku", "Claude 3 Haiku (premium)", 200000, False),
+]
+
+DEFAULT_EMBEDDING_MODELS = [
+    ("qwen/qwen3-embedding-4b", "Qwen3 Embedding 4B (barato)", 2560),
+    ("text-embedding-3-small", "Text Embedding 3 Small", 1536),
+    ("text-embedding-3-large", "Text Embedding 3 Large", 3072),
+    ("text-embedding-ada-002", "Text Embedding Ada v2", 1536),
+]
+
+DEFAULT_TOOLS = [
+    (
+        "rag",
+        "Busca na Base de Conhecimento",
+        "Busca em documentos PDF e artigos da empresa",
+        "search",
+        False,
+        None,
+    ),
+    (
+        "abrir_ticket",
+        "Abertura de Ticket Internamente",
+        "Cria tickets automaticamente para o setor certo",
+        "ticket",
+        False,
+        None,
+    ),
+]
+
+
 class AIConfigService:
     """Service for managing AI configuration"""
 
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def ensure_default_catalog(self) -> int:
+        """Ensure the default OpenRouter catalog exists and return its provider id."""
+
+        provider_result = await self.db.execute(
+            select(AIProvider).where(AIProvider.name == "openrouter")
+        )
+        provider = provider_result.scalar_one_or_none()
+
+        if not provider:
+            provider = AIProvider(
+                name="openrouter",
+                display_name="OpenRouter",
+                api_url="https://openrouter.ai/api/v1",
+                is_active=True,
+            )
+            self.db.add(provider)
+            await self.db.flush()
+
+        model_result = await self.db.execute(
+            select(AIModel.name, AIModel.model_type).where(
+                AIModel.provider_id == provider.id
+            )
+        )
+        existing_models = set(model_result.all())
+
+        for name, display_name, max_tokens, supports_function_calling in DEFAULT_LLM_MODELS:
+            if (name, "llm") not in existing_models:
+                self.db.add(
+                    AIModel(
+                        provider_id=provider.id,
+                        name=name,
+                        display_name=display_name,
+                        model_type="llm",
+                        max_tokens=max_tokens,
+                        supports_function_calling=supports_function_calling,
+                        is_active=True,
+                    )
+                )
+
+        for name, display_name, dimensions in DEFAULT_EMBEDDING_MODELS:
+            if (name, "embedding") not in existing_models:
+                self.db.add(
+                    AIModel(
+                        provider_id=provider.id,
+                        name=name,
+                        display_name=display_name,
+                        model_type="embedding",
+                        embedding_dimensions=dimensions,
+                        is_active=True,
+                    )
+                )
+
+        tool_result = await self.db.execute(select(AITool.name))
+        existing_tools = {name for (name,) in tool_result.all()}
+
+        for name, display_name, description, icon, requires_integration, schema in DEFAULT_TOOLS:
+            if name not in existing_tools:
+                self.db.add(
+                    AITool(
+                        name=name,
+                        display_name=display_name,
+                        description=description,
+                        icon=icon,
+                        requires_integration=requires_integration,
+                        schema_definition=schema,
+                        is_active=True,
+                    )
+                )
+
+        await self.db.commit()
+        return provider.id
+
     async def get_or_create_config(self, company_id: int) -> CompanyAIConfig:
         """Get or create AI config for a company"""
+        provider_id = await self.ensure_default_catalog()
+
         result = await self.db.execute(
             select(CompanyAIConfig).where(CompanyAIConfig.company_id == company_id)
         )
@@ -34,7 +158,7 @@ class AIConfigService:
             # Create default config
             config = CompanyAIConfig(
                 company_id=company_id,
-                provider_id=1,  # OpenRouter default
+                provider_id=provider_id,
                 llm_model="google/gemini-1.5-flash",
                 temperature=0.7,
                 max_tokens=2048,
@@ -45,6 +169,10 @@ class AIConfigService:
                 is_active=True,
             )
             self.db.add(config)
+            await self.db.commit()
+            await self.db.refresh(config)
+        elif not config.provider_id:
+            config.provider_id = provider_id
             await self.db.commit()
             await self.db.refresh(config)
 
@@ -85,7 +213,7 @@ class AIConfigService:
         import httpx
 
         try:
-            response = httpx.post(
+            response = httpx.get(
                 "https://openrouter.ai/api/v1/models",
                 headers={
                     "Authorization": f"Bearer {api_key}",

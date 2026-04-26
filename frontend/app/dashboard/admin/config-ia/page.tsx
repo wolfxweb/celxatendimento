@@ -83,8 +83,8 @@ export default function AdminConfigIAPage() {
       setSystemPrompt(result.config.system_prompt);
       setAutonomyLevel(result.config.autonomy_level);
       setSelectedTools(result.config.tools || []);
-    } catch (err) {
-      setError('Erro ao carregar configuração');
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao carregar configuração');
     } finally {
       setLoading(false);
     }
@@ -107,8 +107,8 @@ export default function AdminConfigIAPage() {
       });
       setSuccess('Configurações salvas com sucesso!');
       loadConfig();
-    } catch (err) {
-      setError('Erro ao salvar configurações');
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao salvar configurações');
     } finally {
       setSaving(false);
     }
@@ -129,8 +129,8 @@ export default function AdminConfigIAPage() {
       setApiKey('');
       setSuccess('Chave API salva com sucesso!');
       loadConfig();
-    } catch (err) {
-      setError('Erro ao salvar chave API');
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao salvar chave API');
     } finally {
       setSaving(false);
     }
@@ -145,7 +145,7 @@ export default function AdminConfigIAPage() {
       await apiPost('/ai-config/test', {});
       setSuccess('Chave API válida! Conexão estabelecida.');
     } catch (err: any) {
-      setError(err.detail || 'Chave API inválida ou erro de conexão');
+      setError(err?.message || 'Chave API inválida ou erro de conexão');
     } finally {
       setSaving(false);
     }
@@ -179,6 +179,13 @@ export default function AdminConfigIAPage() {
   }
 
   const { config, llm_models, tools } = data;
+  const selectedModel = llm_models.find(m => m.name === llmModel)
+  const freeModels = llm_models.filter(m => m.name.includes('gemini') || m.name.includes('llama') || m.name.includes('mistral'))
+  const paidModels = llm_models.filter(m => m.name.includes('gpt') || m.name.includes('claude'))
+  const otherModels = llm_models.filter(model =>
+    !freeModels.some(freeModel => freeModel.id === model.id) &&
+    !paidModels.some(paidModel => paidModel.id === model.id)
+  )
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -288,32 +295,45 @@ export default function AdminConfigIAPage() {
               id="llmModel"
               value={llmModel}
               onChange={(e) => setLlmModel(e.target.value)}
+              disabled={llm_models.length === 0}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
             >
+              {llm_models.length === 0 && (
+                <option value="">Nenhum modelo cadastrado</option>
+              )}
               <optgroup label="🎁 Gratuitos (OpenRouter)">
-                {llm_models.filter(m => m.name.includes('gemini') || m.name.includes('llama') || m.name.includes('mistral')).map((model) => (
+                {freeModels.map((model) => (
                   <option key={model.id} value={model.name}>
                     {model.display_name}
                   </option>
                 ))}
               </optgroup>
               <optgroup label="💰 Pago">
-                {llm_models.filter(m => m.name.includes('gpt') || m.name.includes('claude')).map((model) => (
+                {paidModels.map((model) => (
                   <option key={model.id} value={model.name}>
                     {model.display_name}
                   </option>
                 ))}
               </optgroup>
+              {otherModels.length > 0 && (
+                <optgroup label="Outros">
+                  {otherModels.map((model) => (
+                    <option key={model.id} value={model.name}>
+                      {model.display_name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             
             {/* Model Info */}
             {llmModel && (
               <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs space-y-1">
-                {llm_models.find(m => m.name === llmModel)?.supports_function_calling && (
+                {selectedModel?.supports_function_calling && (
                   <span className="text-emerald-600">✓ Suporta Function Calling</span>
                 )}
-                {llm_models.find(m => m.name === llmModel)?.max_tokens && (
-                  <span className="text-slate-500 block">Max: {llm_models.find(m => m.name === llmModel)?.max_tokens?.toLocaleString()} tokens</span>
+                {selectedModel?.max_tokens && (
+                  <span className="text-slate-500 block">Max: {selectedModel.max_tokens.toLocaleString()} tokens</span>
                 )}
               </div>
             )}
