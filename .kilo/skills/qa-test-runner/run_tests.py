@@ -247,8 +247,14 @@ def main():
         frontend_results['failed'] = 1
 
     # ========== BACKEND TESTS ==========
+    # Use venv python if available, otherwise python3
+    python_cmd = "python3"
+    venv_python = BACKEND_DIR / ".venv" / "bin" / "python"
+    if venv_python.exists():
+        python_cmd = str(venv_python)
+
     be_success, be_output = run_command(
-        ["python3", "-m", "pytest", "-v", "--tb=short"],
+        [python_cmd, "-m", "pytest", "-v", "--tb=short"],
         BACKEND_DIR,
         "BACKEND TESTS (Pytest)"
     )
