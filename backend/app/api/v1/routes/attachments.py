@@ -135,6 +135,13 @@ async def upload_attachments(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro interno ao salvar anexo: {str(e)}",
+        )
 
 
 @router.get("/{ticket_id}/attachments", response_model=dict)
@@ -176,7 +183,7 @@ async def list_attachments(
             )
             user = user_result.scalar_one_or_none()
             if user:
-                uploader_name = user.name or user.email or "Usuário"
+                uploader_name = user.full_name or user.email or "Usuário"
 
         attachments_data.append(
             AttachmentListResponse(
@@ -185,7 +192,8 @@ async def list_attachments(
                 file_size=att.file_size,
                 mime_type=att.mime_type,
                 uploaded_by={"id": att.uploaded_by, "name": uploader_name} if att.uploaded_by else None,
-                created_at=att.uploaded_at,
+                created_at=att.created_at,
+                storage_url=f"/uploads/{ticket.company_id}/tickets/{ticket.id}/{os.path.basename(att.storage_path)}",
             )
         )
 

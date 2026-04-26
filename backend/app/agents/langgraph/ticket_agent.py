@@ -160,21 +160,21 @@ async def generate_ai_response(state: AgentState) -> AgentState:
         # Create prompt
         prompt = f"""Você é um agente de atendimento ao cliente.{system_prompt}
 
-=== Ticket do Cliente ===
-Assunto: {state["ticket_subject"]}
-Descrição: {state["ticket_description"]}
-Email: {state["customer_email"]}
-Prioridade: {state["priority"]}
+        === Ticket do Cliente ===
+        Assunto: {state["ticket_subject"]}
+        Descrição: {state["ticket_description"]}
+        Email: {state["customer_email"]}
+        Prioridade: {state["priority"]}
 
-=== Contexto (RAG) ===
-{context}
+        === Contexto (RAG) ===
+        {context}
 
-=== Instruções ===
-Responda ao ticket do cliente de forma profissional, amigável e útil.
-Se houver informações relevantes na base de conhecimento, use-as para fundamentar sua resposta.
-Se a pergunta estiver fora do escopo do atendimento, dirija o cliente para os canais adequados.
-Responda em português brasileiro.
-"""
+        === Instruções ===
+        Responda ao ticket do cliente de forma profissional, amigável e útil.
+        Se houver informações relevantes na base de conhecimento, use-as para fundamentar sua resposta.
+        Se a pergunta estiver fora do escopo do atendimento, dirija o cliente para os canais adequados.
+        Responda em português brasileiro.
+        """
 
         # Generate response
         response = await llm.ainvoke(prompt)

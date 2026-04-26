@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation'
 import { apiFetch, apiPost, apiUpload } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
 interface Attachment {
   id: number
   filename: string
@@ -12,6 +14,7 @@ interface Attachment {
   mime_type: string
   uploaded_by: { id: number; name: string } | null
   created_at: string
+  storage_url: string | null
 }
 
 interface FilePreview {
@@ -205,7 +208,7 @@ export default function TicketDetailPage() {
       loadRelations()
     } else if (tab === 'alteracoes' && auditLog.length === 0) {
       loadAuditLog()
-    } else if (tab === 'mensagens' && attachments.length === 0) {
+    } else if (tab === 'anexos' && attachments.length === 0) {
       loadAttachments()
     }
   }
@@ -289,10 +292,19 @@ export default function TicketDetailPage() {
       loadTicket()
       loadAttachments()
     } catch (err) {
-      alert('Erro ao enviar mensagem')
+      const message = err && typeof err === 'object' && 'message' in err
+        ? String((err as { message: unknown }).message)
+        : 'Erro ao enviar mensagem'
+      alert(message)
     } finally {
       setSending(false)
     }
+  }
+
+  function getAttachmentUrl(attachment: Attachment): string | undefined {
+    if (!attachment.storage_url) return undefined
+    if (attachment.storage_url.startsWith('http')) return attachment.storage_url
+    return `${API_URL}${attachment.storage_url}`
   }
 
   async function handleCloseTicket() {
@@ -607,6 +619,53 @@ export default function TicketDetailPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Anexos Tab */}
+          {activeTab === 'anexos' && (
+            <div>
+              {attachments.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="text-5xl mb-3">📎</div>
+                  <p className="text-slate-500">Nenhum anexo enviado</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {attachments.map((attachment) => {
+                    const url = getAttachmentUrl(attachment)
+
+                    return (
+                      <div
+                        key={attachment.id}
+                        className="flex items-center justify-between gap-4 p-4 rounded-xl border border-slate-200 bg-slate-50/50"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-2xl shrink-0">{getFileIcon(attachment.filename)}</span>
+                          <div className="min-w-0">
+                            <p className="font-medium text-slate-700 truncate">{attachment.filename}</p>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                              <span>{formatFileSize(attachment.file_size)}</span>
+                              <span>{formatDate(attachment.created_at)}</span>
+                              {attachment.uploaded_by?.name && <span>{attachment.uploaded_by.name}</span>}
+                            </div>
+                          </div>
+                        </div>
+                        {url && (
+                          <a
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="shrink-0 px-4 py-2 rounded-lg bg-white border border-slate-200 text-sm font-medium text-slate-600 hover:border-primary-300 hover:text-primary-600 transition-colors"
+                          >
+                            Abrir
+                          </a>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>

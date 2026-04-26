@@ -396,14 +396,16 @@ CREATE TABLE ticket_attachments (
     
     -- Upload
     uploaded_by INTEGER REFERENCES users(id),
-    uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     
     -- Status
     is_active BOOLEAN DEFAULT TRUE,
     is_scanned BOOLEAN DEFAULT FALSE,  -- Escaneado por malware
     scan_result VARCHAR(50),
     deleted_at TIMESTAMP WITH TIME ZONE,
-    deleted_by INTEGER REFERENCES users(id)
+    deleted_by INTEGER REFERENCES users(id),
+
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX idx_attachments_ticket ON ticket_attachments(ticket_id);

@@ -236,6 +236,7 @@ class AttachmentListResponse(BaseModel):
     mime_type: str
     uploaded_by: Optional[dict] = None  # {"id": 1, "name": "João Silva"}
     created_at: datetime
+    storage_url: Optional[str] = None
 
     class Config:
         from_attributes = True

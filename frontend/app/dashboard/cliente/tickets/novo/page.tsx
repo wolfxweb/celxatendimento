@@ -147,7 +147,6 @@ export default function NovoTicketPage() {
 
       const result = await apiPost<TicketCreateResponse>('/tickets', ticketData)
 
-      // If there are attachments, upload them
       if (attachments.length > 0) {
         const formData = new FormData()
         attachments.forEach(att => {
@@ -155,10 +154,12 @@ export default function NovoTicketPage() {
         })
 
         try {
-          await apiUpload(`/tickets/${result.id}/attachments`, formData)
-        } catch (uploadErr) {
+          const uploadResult = await apiUpload(`/tickets/${result.id}/attachments`, formData)
+          console.log('Upload success:', uploadResult)
+        } catch (uploadErr: any) {
           console.error('Erro ao upload anexos:', uploadErr)
-          // Continue anyway - ticket was created
+          const errorMsg = uploadErr?.message || 'Erro desconhecido'
+          alert(`ATENÇÃO: Ticket criado, mas falha ao enviar anexos: ${errorMsg}`)
         }
       }
 

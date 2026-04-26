@@ -5,11 +5,10 @@ Handles file uploads and attachments for tickets and messages.
 """
 
 import os
-import uuid
-import aiofiles
 import shutil
+import uuid
 from datetime import datetime
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -86,12 +85,10 @@ class AttachmentService:
         )
         os.makedirs(upload_dir, exist_ok=True)
 
-        # Generate unique filename to avoid collisions
-        unique_filename = f"{uuid.uuid4()}_{filename}"
-        filepath = os.path.join(upload_dir, unique_filename)
+        filepath = os.path.join(upload_dir, filename)
 
-        async with aiofiles.open(filepath, "wb") as f:
-            await f.write(content)
+        with open(filepath, "wb") as f:
+            f.write(content)
 
         return filepath
 
@@ -304,7 +301,7 @@ class AttachmentService:
         if message_id:
             query = query.where(TicketAttachment.message_id == message_id)
 
-        query = query.order_by(TicketAttachment.uploaded_at.desc())
+        query = query.order_by(TicketAttachment.created_at.desc())
 
         result = await self.db.execute(query)
         return result.scalars().all()
