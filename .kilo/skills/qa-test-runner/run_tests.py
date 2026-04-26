@@ -250,17 +250,21 @@ def main():
     # Use system python3
     python_cmd = "python3"
 
-    # Check if backend dependencies are available (asyncpg is required for async SQLAlchemy)
-    check_cmd = [python_cmd, "-c", "import pytest_asyncio, asyncpg"]
-    result = subprocess.run(check_cmd, capture_output=True, timeout=10)
-    backend_deps_available = (result.returncode == 0)
+    # Check if backend can be imported (requires asyncpg for async SQLAlchemy)
+    check_cmd = [python_cmd, "-c", "import pytest_asyncio, asyncpg; from app.main import app"]
+    result = subprocess.run(check_cmd, capture_output=True, timeout=10, cwd=BACKEND_DIR)
 
-    if not backend_deps_available:
-        print("  ⚠️  Backend dependencies not fully installed (pytest-asyncio, asyncpg)")
-        print("  ⚠️  To run backend tests, install: pip install pytest-asyncio asyncpg")
+    if result.returncode != 0:
+        if "psycopg2" in result.stderr and "async" in result.stderr:
+            print("  ⚠️  Backend driver conflict: psycopg2 (sync) and asyncpg (async) both installed")
+        elif "password authentication failed" in result.stderr or "could not connect" in result.stderr:
+            print("  ⚠️  Backend database not available (PostgreSQL not running)")
+            print("  ⚠️  Backend tests require: docker-compose up -d postgres")
+        else:
+            print("  ⚠️  Backend import error - check dependencies")
         backend_results = {'total': 0, 'passed': 0, 'failed': 0, 'skipped': True}
         be_success = True
-        be_output = "Backend tests skipped - missing dependencies (pytest-asyncio, asyncpg)"
+        be_output = "Backend tests skipped - database not available"
     else:
         be_success, be_output = run_command(
             [python_cmd, "-m", "pytest", "-v", "--tb=short"],

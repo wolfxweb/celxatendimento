@@ -4,13 +4,14 @@ pytest configuration and fixtures
 
 import asyncio
 import os
+import uuid
 import pytest
 import pytest_asyncio
 from typing import AsyncGenerator
 
 # Set test database URL
 os.environ["DATABASE_URL"] = (
-    "postgresql://postgres:postgres@localhost:5432/celx_atendimento_test"
+    "postgresql+asyncpg://postgres:celx123456@localhost:5432/celx_atendimento_test"
 )
 
 
@@ -23,12 +24,19 @@ def event_loop():
 
 
 @pytest_asyncio.fixture
-async def db_session() -> AsyncGenerator:
+async def db_session():
     """Get async database session for tests"""
     from app.database import AsyncSessionLocal
 
     async with AsyncSessionLocal() as session:
-        yield session
+        # Start transaction
+        nested = await session.begin_nested()
+        try:
+            yield session
+        finally:
+            # Rollback any uncommitted changes
+            await session.rollback()
+            await session.close()
 
 
 @pytest_asyncio.fixture
@@ -38,13 +46,12 @@ async def test_company(db_session):
 
     company = Company(
         name="Test Company",
-        domain="test.com",
+        domain=f"test-{uuid.uuid4().hex[:8]}.com",
         contact_email="test@test.com",
         status="active",
     )
     db_session.add(company)
-    await db_session.commit()
-    await db_session.refresh(company)
+    await db_session.flush()
 
     yield company
 
@@ -57,15 +64,14 @@ async def test_user(db_session, test_company):
 
     user = User(
         company_id=test_company.id,
-        email="test@test.com",
+        email=f"user-{uuid.uuid4().hex[:8]}@test.com",
         hashed_password=get_password_hash("testpass123"),
         full_name="Test User",
         role="admin",
         is_active=True,
     )
     db_session.add(user)
-    await db_session.commit()
-    await db_session.refresh(user)
+    await db_session.flush()
 
     yield user
 
@@ -78,15 +84,14 @@ async def test_agent(db_session, test_company):
 
     agent = User(
         company_id=test_company.id,
-        email="agent@test.com",
+        email=f"agent-{uuid.uuid4().hex[:8]}@test.com",
         hashed_password=get_password_hash("agentpass123"),
         full_name="Test Agent",
         role="agent",
         is_active=True,
     )
     db_session.add(agent)
-    await db_session.commit()
-    await db_session.refresh(agent)
+    await db_session.flush()
 
     yield agent
 
@@ -99,15 +104,14 @@ async def test_customer(db_session, test_company):
 
     customer = User(
         company_id=test_company.id,
-        email="customer@test.com",
+        email=f"customer-{uuid.uuid4().hex[:8]}@test.com",
         hashed_password=get_password_hash("customerpass123"),
         full_name="Test Customer",
         role="customer",
         is_active=True,
     )
     db_session.add(customer)
-    await db_session.commit()
-    await db_session.refresh(customer)
+    await db_session.flush()
 
     yield customer
 
@@ -125,8 +129,7 @@ async def test_category(db_session, test_company):
         is_active=True,
     )
     db_session.add(category)
-    await db_session.commit()
-    await db_session.refresh(category)
+    await db_session.flush()
 
     yield category
 
@@ -139,7 +142,7 @@ async def test_ticket(db_session, test_company, test_customer, test_category):
     ticket = Ticket(
         company_id=test_company.id,
         user_id=test_customer.id,
-        ticket_number="TKT-TEST-000001",
+        ticket_number=f"TKT-TEST-{uuid.uuid4().hex[:6].upper()}",
         subject="Test Ticket",
         description="This is a test ticket",
         status="open",
@@ -147,8 +150,7 @@ async def test_ticket(db_session, test_company, test_customer, test_category):
         category_id=test_category.id,
     )
     db_session.add(ticket)
-    await db_session.commit()
-    await db_session.refresh(ticket)
+    await db_session.flush()
 
     yield ticket
 

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, Enum, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -17,8 +17,11 @@ class Company(Base, TimestampMixin):
     domain: Mapped[str] = mapped_column(String(255), nullable=True)
     logo_url: Mapped[str] = mapped_column(String(500), nullable=True)
 
-    # Status
-    status: Mapped[str] = mapped_column(String(50), default="pending")
+    # Status - use Enum to match PostgreSQL enum type
+    status: Mapped[str] = mapped_column(
+        Enum("pending", "active", "suspended", "cancelled", name="company_status", native_enum=True, create_type=False),
+        default="pending",
+    )
     status_reason: Mapped[str] = mapped_column(Text, nullable=True)
     approved_by: Mapped[int] = mapped_column(Integer, nullable=True)
     approved_at: Mapped[datetime] = mapped_column(

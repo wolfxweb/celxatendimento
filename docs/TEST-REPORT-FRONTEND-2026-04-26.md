@@ -1,6 +1,6 @@
 # 📊 Relatório de Testes E2E - Frontend (Execução Real)
 
-**Data:** 2026-04-26 13:35:48
+**Data:** 2026-04-26 13:58:57
 **Sistema:** celx-atendimento (Frontend Next.js)
 **Framework:** Playwright
 **Browser:** Chromium + Mobile Chrome
@@ -51,6 +51,6 @@ Screenshots de falha salvos em: `frontend/test-results/`
 
 ---
 
-*Relatório gerado em: 2026-04-26 13:35:48*
+*Relatório gerado em: 2026-04-26 13:58:57*
 *Execução real com Playwright Chromium + Mobile Chrome*
 *52/52 testes passando (100.0%)*
