@@ -19,12 +19,26 @@ async function loginAs(page: Page, user: keyof typeof USERS) {
   await expect(page.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeVisible();
 }
 
+async function logout(page: Page) {
+  const logoutLink = page.getByRole('link', { name: /sair/i });
+
+  if (!(await logoutLink.isVisible())) {
+    await page.getByRole('button', { name: /abrir menu/i }).click();
+  }
+
+  await logoutLink.click();
+}
+
 function dashboardNav(page: Page) {
   return page.locator('aside nav');
 }
 
 function navLink(page: Page, label: string) {
   return dashboardNav(page).getByRole('link', { name: new RegExp(label, 'i') });
+}
+
+function navLinkByHref(page: Page, href: string) {
+  return dashboardNav(page).locator(`a[href="${href}"]`);
 }
 
 async function apiLogin(request: APIRequestContext, user: keyof typeof USERS) {
@@ -87,7 +101,7 @@ test.describe('Authentication', () => {
 
   test('AUTH-E2E-006: Logout and redirect to login', async ({ page }) => {
     await loginAs(page, 'admin');
-    await page.getByRole('link', { name: /sair/i }).click();
+    await logout(page);
     await page.waitForURL('**/login', { timeout: 10000 });
     await expect(page.locator('#email')).toBeVisible();
   });
@@ -153,7 +167,9 @@ test.describe('Agent Ticket Management', () => {
     await expect(ticketLink).toBeVisible({ timeout: 10000 });
     await ticketLink.click();
 
-    await expect(page.getByText(/cliente:/i)).toBeVisible({ timeout: 10000 });
+    await expect(page).toHaveURL(/\/dashboard\/atendente\/tickets\/\d+$/);
+    await expect(page.getByRole('heading', { level: 3, name: 'Enviar Mensagem' })).toBeVisible({ timeout: 10000 });
+    await expect(page.getByText(/cliente@celx\.com\.br/i)).toBeVisible();
   });
 
   test('AGT-E2E-005: Send customer message', async ({ page }) => {
@@ -244,32 +260,32 @@ test.describe('Superadmin Plan Management', () => {
 test.describe('Dashboard Access Control', () => {
   test('DASH-E2E-001: Superadmin sees Empresas and Planos', async ({ page }) => {
     await loginAs(page, 'superadmin');
-    await expect(navLink(page, 'Empresas')).toBeVisible();
-    await expect(navLink(page, 'Planos')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/superadmin/empresas')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/superadmin/planos')).toBeVisible();
   });
 
   test('DASH-E2E-002: Admin sees full menu', async ({ page }) => {
     await loginAs(page, 'admin');
-    await expect(navLink(page, 'Meus Tickets')).toBeVisible();
-    await expect(navLink(page, 'Tickets')).toBeVisible();
-    await expect(navLink(page, 'Aprovar IA')).toBeVisible();
-    await expect(navLink(page, 'Usuários')).toBeVisible();
-    await expect(navLink(page, 'Config IA')).toBeVisible();
-    await expect(navLink(page, 'Conhecimento')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/cliente/tickets')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/atendente/tickets')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/atendente/aprovacao')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/admin/usuarios')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/admin/config-ia')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/admin/conhecimento')).toBeVisible();
   });
 
   test('DASH-E2E-003: Agent sees Tickets and Aprovar IA', async ({ page }) => {
     await loginAs(page, 'agent');
-    await expect(navLink(page, 'Tickets')).toBeVisible();
-    await expect(navLink(page, 'Aprovar IA')).toBeVisible();
-    await expect(navLink(page, 'Usuários')).toHaveCount(0);
+    await expect(navLinkByHref(page, '/dashboard/atendente/tickets')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/atendente/aprovacao')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/admin/usuarios')).toHaveCount(0);
   });
 
   test('DASH-E2E-004: Customer sees only Meus Tickets', async ({ page }) => {
     await loginAs(page, 'customer');
-    await expect(navLink(page, 'Meus Tickets')).toBeVisible();
-    await expect(navLink(page, 'Tickets')).toHaveCount(0);
-    await expect(navLink(page, 'Aprovar IA')).toHaveCount(0);
+    await expect(navLinkByHref(page, '/dashboard/cliente/tickets')).toBeVisible();
+    await expect(navLinkByHref(page, '/dashboard/atendente/tickets')).toHaveCount(0);
+    await expect(navLinkByHref(page, '/dashboard/atendente/aprovacao')).toHaveCount(0);
   });
 });
 

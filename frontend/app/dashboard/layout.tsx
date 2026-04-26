@@ -34,7 +34,7 @@ export default function DashboardLayout({
   const router = useRouter()
   const [user, setUser] = useState<{ email: string; role: string; full_name: string } | null>(null)
   const [loading, setLoading] = useState(true)
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -58,6 +58,16 @@ export default function DashboardLayout({
     setLoading(false)
   }, [router])
 
+  useEffect(() => {
+    const syncSidebar = () => {
+      setSidebarOpen(window.innerWidth >= 768)
+    }
+
+    syncSidebar()
+    window.addEventListener('resize', syncSidebar)
+    return () => window.removeEventListener('resize', syncSidebar)
+  }, [])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
@@ -74,8 +84,17 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-slate-50 to-slate-100">
+      {sidebarOpen && (
+        <button
+          type="button"
+          aria-label="Fechar menu"
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 z-40 bg-slate-900/40 md:hidden"
+        />
+      )}
+
       {/* Modern Sidebar */}
-      <aside className={`fixed top-0 left-0 h-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 z-50 transition-all duration-300 ${sidebarOpen ? 'w-64' : 'w-20'}`}>
+      <aside className={`fixed top-0 left-0 h-full bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 z-50 transition-all duration-300 ${sidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full md:translate-x-0 md:w-20'}`}>
         {/* Logo */}
         <div className="p-6 border-b border-slate-700/50">
           <div className="flex items-center gap-3">
@@ -93,7 +112,8 @@ export default function DashboardLayout({
         {/* Toggle Button */}
         <button 
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="absolute -right-3 top-20 w-8 h-8 bg-gradient-to-br from-slate-700 to-slate-800 rounded-full flex items-center justify-center text-white shadow-lg hover:shadow-glow-primary hover:scale-110 transition-all duration-300 border-2 border-slate-600 hover:border-primary-500"
+          className="hidden md:flex absolute -right-3 top-20 w-8 h-8 bg-gradient-to-br from-slate-700 to-slate-800 rounded-full items-center justify-center text-white shadow-lg hover:shadow-glow-primary hover:scale-110 transition-all duration-300 border-2 border-slate-600 hover:border-primary-500"
+          aria-label={sidebarOpen ? 'Recolher menu' : 'Expandir menu'}
         >
           {sidebarOpen ? (
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -112,6 +132,11 @@ export default function DashboardLayout({
             <Link
               key={item.href}
               href={item.href}
+              onClick={() => {
+                if (window.innerWidth < 768) {
+                  setSidebarOpen(false)
+                }
+              }}
               className="flex items-center gap-3 px-4 py-3 rounded-xl text-slate-300 hover:text-white hover:bg-slate-700/50 transition-all duration-200 group"
             >
               <span className="text-xl group-hover:scale-110 transition-transform">{item.icon}</span>
@@ -155,20 +180,32 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content Area */}
-      <div className={`transition-all duration-300 ${sidebarOpen ? 'ml-64' : 'ml-20'}`}>
+      <div className={`transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
         {/* Top Header Bar */}
         <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 shadow-sm">
-          <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-            <div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="md:hidden shrink-0 p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                aria-label="Abrir menu"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16" />
+                </svg>
+              </button>
+              <div className="min-w-0">
               <h2 className="text-lg font-semibold text-slate-800">
                 Olá, <span className="text-primary-600">{user?.full_name?.split(' ')[0]}</span> 👋
               </h2>
               <p className="text-sm text-slate-500">
                 {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
               </p>
+              </div>
             </div>
             
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
               {/* Role Badge */}
               <span className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
                 user?.role === 'superadmin' ? 'bg-amber-100 text-amber-700' :
@@ -189,7 +226,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Page Content */}
-        <main className="p-6">
+        <main className="p-4 sm:p-6">
           <div className="animate-fade-in">
             {children}
           </div>
