@@ -61,6 +61,7 @@ export default function AdminConfigIAPage() {
 
   const [apiKey, setApiKey] = useState('');
   const [llmModel, setLlmModel] = useState('');
+  const [embeddingModel, setEmbeddingModel] = useState('');
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(2048);
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -78,6 +79,7 @@ export default function AdminConfigIAPage() {
       setData(result);
       
       setLlmModel(result.config.llm_model);
+      setEmbeddingModel(result.config.embedding_model);
       setTemperature(result.config.temperature);
       setMaxTokens(result.config.max_tokens);
       setSystemPrompt(result.config.system_prompt);
@@ -99,6 +101,7 @@ export default function AdminConfigIAPage() {
     try {
       await apiPut('/ai-config', {
         llm_model: llmModel,
+        embedding_model: embeddingModel,
         temperature: temperature,
         max_tokens: maxTokens,
         system_prompt: systemPrompt,
@@ -178,13 +181,30 @@ export default function AdminConfigIAPage() {
     );
   }
 
-  const { config, llm_models, tools } = data;
+  const { config, llm_models, embedding_models, tools } = data;
   const selectedModel = llm_models.find(m => m.name === llmModel)
-  const freeModels = llm_models.filter(m => m.name.includes('gemini') || m.name.includes('llama') || m.name.includes('mistral'))
-  const paidModels = llm_models.filter(m => m.name.includes('gpt') || m.name.includes('claude'))
+  const selectedEmbeddingModel = embedding_models.find(m => m.name === embeddingModel)
+  const freeModels = llm_models.filter(m => m.name.endsWith(':free') || m.name === 'openrouter/free' || m.display_name.includes('FREE'))
+  const cheapModels = llm_models.filter(m =>
+    !freeModels.some(freeModel => freeModel.id === m.id) &&
+    (
+      m.display_name.toLowerCase().includes('barato') ||
+      m.display_name.toLowerCase().includes('baixo custo') ||
+      m.name.includes('gemma') ||
+      m.name.includes('qwen') ||
+      m.name.includes('deepseek') ||
+      m.name.includes('gpt-4o-mini')
+    )
+  )
+  const premiumModels = llm_models.filter(m =>
+    !freeModels.some(freeModel => freeModel.id === m.id) &&
+    !cheapModels.some(cheapModel => cheapModel.id === m.id) &&
+    (m.name.includes('gpt') || m.name.includes('claude'))
+  )
   const otherModels = llm_models.filter(model =>
     !freeModels.some(freeModel => freeModel.id === model.id) &&
-    !paidModels.some(paidModel => paidModel.id === model.id)
+    !cheapModels.some(cheapModel => cheapModel.id === model.id) &&
+    !premiumModels.some(premiumModel => premiumModel.id === model.id)
   )
 
   return (
@@ -308,8 +328,15 @@ export default function AdminConfigIAPage() {
                   </option>
                 ))}
               </optgroup>
-              <optgroup label="💰 Pago">
-                {paidModels.map((model) => (
+              <optgroup label="💸 Baratos">
+                {cheapModels.map((model) => (
+                  <option key={model.id} value={model.name}>
+                    {model.display_name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="💰 Premium">
+                {premiumModels.map((model) => (
                   <option key={model.id} value={model.name}>
                     {model.display_name}
                   </option>
@@ -339,6 +366,38 @@ export default function AdminConfigIAPage() {
             )}
           </div>
 
+          {/* Embedding Model */}
+          <div className="space-y-3">
+            <label htmlFor="embeddingModel" className="text-sm font-semibold text-slate-700">
+              Modelo de Embedding
+            </label>
+            <select
+              id="embeddingModel"
+              value={embeddingModel}
+              onChange={(e) => setEmbeddingModel(e.target.value)}
+              disabled={embedding_models.length === 0}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
+            >
+              {embedding_models.length === 0 && (
+                <option value="">Nenhum embedding cadastrado</option>
+              )}
+              {embedding_models.map((model) => (
+                <option key={model.id} value={model.name}>
+                  {model.display_name}
+                </option>
+              ))}
+            </select>
+            {selectedEmbeddingModel && (
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 text-xs">
+                <span className="text-slate-500">
+                  Dimensões: {selectedEmbeddingModel.embedding_dimensions?.toLocaleString() || 'não informado'}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-6 mt-6">
           {/* Temperature */}
           <div className="space-y-3">
             <label htmlFor="temperature" className="text-sm font-semibold text-slate-700">
@@ -361,28 +420,28 @@ export default function AdminConfigIAPage() {
               <span>🎨 Criativo</span>
             </div>
           </div>
-        </div>
 
-        {/* Max Tokens */}
-        <div className="mt-6 space-y-3">
-          <label htmlFor="maxTokens" className="text-sm font-semibold text-slate-700">
-            Máximo de Tokens: <span className="text-primary-600">{maxTokens.toLocaleString()}</span>
-          </label>
-          <input
-            id="maxTokens"
-            type="range"
-            min="256"
-            max="128000"
-            step="256"
-            value={maxTokens}
-            onChange={(e) => setMaxTokens(parseInt(e.target.value))}
-            className="w-full h-2 rounded-lg appearance-none bg-slate-200"
-            style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((maxTokens-256)/(128000-256))*100}%, #e2e8f0 ${((maxTokens-256)/(128000-256))*100}%, #e2e8f0 100%)` }}
-          />
-          <div className="flex justify-between text-xs text-slate-400">
-            <span>256</span>
-            <span>32K</span>
-            <span>128K</span>
+          {/* Max Tokens */}
+          <div className="space-y-3">
+            <label htmlFor="maxTokens" className="text-sm font-semibold text-slate-700">
+              Máximo de Tokens: <span className="text-primary-600">{maxTokens.toLocaleString()}</span>
+            </label>
+            <input
+              id="maxTokens"
+              type="range"
+              min="256"
+              max="128000"
+              step="256"
+              value={maxTokens}
+              onChange={(e) => setMaxTokens(parseInt(e.target.value))}
+              className="w-full h-2 rounded-lg appearance-none bg-slate-200"
+              style={{ background: `linear-gradient(to right, #6366f1 0%, #6366f1 ${((maxTokens-256)/(128000-256))*100}%, #e2e8f0 ${((maxTokens-256)/(128000-256))*100}%, #e2e8f0 100%)` }}
+            />
+            <div className="flex justify-between text-xs text-slate-400">
+              <span>256</span>
+              <span>32K</span>
+              <span>128K</span>
+            </div>
           </div>
         </div>
       </div>
