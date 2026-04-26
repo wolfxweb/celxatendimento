@@ -131,12 +131,12 @@ export default function AdminCategoriasPage() {
       } else if (confirmModal.action === 'delete') {
         await apiDelete(`/categories/${confirmModal.category.id}`)
       }
-      setConfirmModal({ isOpen: false, action: null, category: null })
       loadCategories()
     } catch (err: any) {
       alert(err?.message || 'Erro ao executar ação')
     } finally {
       setSaving(false)
+      setConfirmModal({ isOpen: false, action: null, category: null })
     }
   }
 

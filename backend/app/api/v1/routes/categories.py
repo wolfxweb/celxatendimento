@@ -320,7 +320,7 @@ async def delete_category(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    """Delete a category (soft delete - marks as inactive)"""
+    """Delete a category permanently when it is not in use"""
 
     # Only admins can delete categories
     if current_user.role not in ["admin", "superadmin"]:
@@ -339,7 +339,13 @@ async def delete_category(
             detail=f"Categoria está em uso por {ticket_count} tickets",
         )
 
-    # Soft delete
-    category.is_active = False
+    # Detach child categories before deleting to avoid self-referential FK errors.
+    child_result = await db.execute(
+        select(Category).where(Category.parent_category_id == category_id)
+    )
+    for child in child_result.scalars().all():
+        child.parent_category_id = None
+
+    await db.delete(category)
 
     await db.commit()
