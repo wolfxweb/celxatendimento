@@ -27,7 +27,7 @@ interface CategoryFormData {
 
 interface ModalState {
   isOpen: boolean
-  mode: 'create' | 'edit' | null
+  mode: 'create' | 'edit' | 'delete' | null
   category: Category | null
 }
 
@@ -36,6 +36,7 @@ export default function AdminCategoriasPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [modal, setModal] = useState<ModalState>({ isOpen: false, mode: null, category: null })
+  const [confirmModal, setConfirmModal] = useState<{ isOpen: boolean; action: 'activate' | 'inactivate' | 'delete' | null; category: Category | null }>({ isOpen: false, action: null, category: null })
   const [formData, setFormData] = useState<CategoryFormData>({
     name: '',
     description: '',
@@ -107,28 +108,40 @@ export default function AdminCategoriasPage() {
 
   async function handleToggleActive(category: Category) {
     const newStatus = !category.is_active
-    const action = newStatus ? 'ativar' : 'inativar'
+    const action = newStatus ? 'activate' : 'inactivate'
 
     if (!newStatus && category.ticket_count > 0) {
-      if (!confirm(`Esta categoria está em uso por ${category.ticket_count} tickets. Deseja inativar mesmo assim?`)) {
-        return
-      }
-    } else if (newStatus) {
-      if (!confirm(`Ativar a categoria "${category.name}"?`)) {
-        return
-      }
+      // Show confirmation modal for inactivating category with tickets
+      setConfirmModal({ isOpen: true, action, category })
     } else {
-      if (!confirm(`Inativar a categoria "${category.name}"?`)) {
-        return
-      }
+      // Direct action for activate or inactivate without tickets
+      setConfirmModal({ isOpen: true, action, category })
     }
+  }
 
+  async function executeAction() {
+    if (!confirmModal.category || !confirmModal.action) return
+
+    setSaving(true)
     try {
-      await apiPatch(`/categories/${category.id}/`, { is_active: newStatus })
+      if (confirmModal.action === 'activate') {
+        await apiPatch(`/categories/${confirmModal.category.id}/`, { is_active: true })
+      } else if (confirmModal.action === 'inactivate') {
+        await apiPatch(`/categories/${confirmModal.category.id}/`, { is_active: false })
+      } else if (confirmModal.action === 'delete') {
+        await apiDelete(`/categories/${confirmModal.category.id}/`)
+      }
+      setConfirmModal({ isOpen: false, action: null, category: null })
       loadCategories()
     } catch (err: any) {
-      alert(err?.message || 'Erro ao atualizar status')
+      alert(err?.message || 'Erro ao executar ação')
+    } finally {
+      setSaving(false)
     }
+  }
+
+  function closeConfirmModal() {
+    setConfirmModal({ isOpen: false, action: null, category: null })
   }
 
   async function handleDelete(category: Category) {
@@ -136,17 +149,7 @@ export default function AdminCategoriasPage() {
       alert(`Não é possível excluir esta categoria pois ela está em uso por ${category.ticket_count} tickets.`)
       return
     }
-
-    if (!confirm(`Excluir definitivamente a categoria "${category.name}"?`)) {
-      return
-    }
-
-    try {
-      await apiDelete(`/categories/${category.id}/`)
-      loadCategories()
-    } catch (err: any) {
-      alert(err?.message || 'Erro ao excluir categoria')
-    }
+    setConfirmModal({ isOpen: true, action: 'delete', category })
   }
 
   function formatSla(minutes: number): string {
@@ -302,7 +305,69 @@ export default function AdminCategoriasPage() {
         </>
       )}
 
-      {/* Modal */}
+      {/* Confirmation Modal */}
+      {confirmModal.isOpen && confirmModal.category && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm h-screen">
+          <div className="w-full max-w-md mx-4 rounded-2xl bg-white shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <h2 className="text-xl font-bold text-slate-800">
+                {confirmModal.action === 'delete' && 'Confirmar Exclusão'}
+                {confirmModal.action === 'activate' && 'Confirmar Ativação'}
+                {confirmModal.action === 'inactivate' && 'Confirmar Inativação'}
+              </h2>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-600">
+                {confirmModal.action === 'delete' && (
+                  <>Excluir definitivamente a categoria "<strong>{confirmModal.category.name}</strong>"? Esta ação não pode ser desfeita.</>
+                )}
+                {confirmModal.action === 'activate' && (
+                  <>Ativar a categoria "<strong>{confirmModal.category.name}</strong>"?</>
+                )}
+                {confirmModal.action === 'inactivate' && (
+                  confirmModal.category.ticket_count > 0 ? (
+                    <>Esta categoria está em uso por <strong>{confirmModal.category.ticket_count} tickets</strong>. Deseja inativar mesmo assim?</>
+                  ) : (
+                    <>Inativar a categoria "<strong>{confirmModal.category.name}</strong>"?</>
+                  )
+                )}
+              </p>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex gap-3">
+              <button
+                type="button"
+                onClick={closeConfirmModal}
+                className="flex-1 px-6 py-3 rounded-xl border border-slate-200 text-slate-600 font-medium hover:bg-slate-50 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={executeAction}
+                disabled={saving}
+                className={`flex-1 px-6 py-3 rounded-xl font-semibold shadow-lg transition-all disabled:opacity-50 ${
+                  confirmModal.action === 'delete'
+                    ? 'bg-gradient-to-r from-red-500 to-rose-500 text-white hover:shadow-glow-red'
+                    : confirmModal.action === 'activate'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:shadow-glow-secondary'
+                    : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-glow-secondary'
+                }`}
+              >
+                {saving ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Processando...
+                  </span>
+                ) : (
+                  confirmModal.action === 'delete' ? 'Excluir' : confirmModal.action === 'activate' ? 'Ativar' : 'Inativar'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Create/Edit */}
       {modal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm h-screen">
           <div className="w-full max-w-lg mx-4 rounded-2xl bg-white shadow-2xl overflow-hidden">

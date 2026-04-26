@@ -7,32 +7,32 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/api/v1/companies',
-        destination: `${apiUrl}/api/v1/companies/`,
+        source: '/api/v1/companies/:path*',
+        destination: `${apiUrl}/api/v1/companies/:path*`,
       },
       {
-        source: '/api/v1/tickets',
-        destination: `${apiUrl}/api/v1/tickets/`,
+        source: '/api/v1/tickets/:path*',
+        destination: `${apiUrl}/api/v1/tickets/:path*`,
       },
       {
-        source: '/api/v1/categories',
-        destination: `${apiUrl}/api/v1/categories/`,
+        source: '/api/v1/categories/:path*',
+        destination: `${apiUrl}/api/v1/categories/:path*`,
       },
       {
-        source: '/api/v1/users',
-        destination: `${apiUrl}/api/v1/users/`,
+        source: '/api/v1/users/:path*',
+        destination: `${apiUrl}/api/v1/users/:path*`,
       },
       {
-        source: '/api/v1/knowledge',
-        destination: `${apiUrl}/api/v1/knowledge/`,
+        source: '/api/v1/knowledge/:path*',
+        destination: `${apiUrl}/api/v1/knowledge/:path*`,
       },
       {
-        source: '/api/v1/ai-config',
-        destination: `${apiUrl}/api/v1/ai-config/`,
+        source: '/api/v1/ai-config/:path*',
+        destination: `${apiUrl}/api/v1/ai-config/:path*`,
       },
       {
-        source: '/api/v1/plans',
-        destination: `${apiUrl}/api/v1/plans/`,
+        source: '/api/v1/plans/:path*',
+        destination: `${apiUrl}/api/v1/plans/:path*`,
       },
       {
         source: '/api/v1/:path*',
