@@ -178,7 +178,7 @@ class TicketService:
         ticket.status = new_status
 
         # Update timestamps based on status
-        if new_status == "pending_agent" and not ticket.first_response_at:
+        if new_status in ["pending_agent", "pending_customer_feedback"] and not ticket.first_response_at:
             ticket.first_response_at = datetime.now()
         elif new_status in ["resolved", "closed"]:
             ticket.resolved_at = datetime.now()

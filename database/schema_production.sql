@@ -151,6 +151,7 @@ CREATE TYPE public.ticket_status AS ENUM (
     'open',
     'pending_ai',
     'pending_agent',
+    'pending_customer_feedback',
     'resolved',
     'closed',
     'rejected'
@@ -1678,4 +1679,3 @@ ALTER TABLE ONLY public.users
 --
 
 \unrestrict KQj0bHWygsqMJkw4pbsAxYJg0VgIqEQv38N1RD8n2eJzTtIUETQXRMKVEbV1i48
-

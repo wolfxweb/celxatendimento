@@ -402,7 +402,7 @@ async def update_ticket(
 
     # Handle status change timestamps
     if ticket_data.status:
-        if ticket_data.status == "pending_agent" and not ticket.first_response_at:
+        if ticket_data.status in ["pending_agent", "pending_customer_feedback"] and not ticket.first_response_at:
             ticket.first_response_at = datetime.now()
         elif ticket_data.status in ["resolved", "closed"]:
             ticket.resolved_at = datetime.now()
@@ -578,7 +578,9 @@ async def approve_ai_response(
     db.add(message)
 
     # Update ticket status
-    ticket.status = "pending_agent"
+    ticket.status = "pending_customer_feedback"
+    if not ticket.first_response_at:
+        ticket.first_response_at = datetime.now()
     ticket.updated_at = datetime.now()
 
     await db.commit()
@@ -722,7 +724,9 @@ async def edit_ai_response(
     db.add(message)
 
     # Update ticket status
-    ticket.status = "pending_agent"
+    ticket.status = "pending_customer_feedback"
+    if not ticket.first_response_at:
+        ticket.first_response_at = datetime.now()
     ticket.updated_at = datetime.now()
 
     await db.commit()

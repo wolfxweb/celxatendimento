@@ -19,14 +19,13 @@ from app.core.security import encrypt_api_key, decrypt_api_key
 
 DEFAULT_LLM_MODELS = [
     ("openrouter/free", "OpenRouter Free Router (FREE)", 262000, False),
+    ("google/gemini-2.5-flash-lite", "Gemini 2.5 Flash Lite (baixo custo)", 1048576, True),
+    ("google/gemini-2.5-flash", "Gemini 2.5 Flash", 1048576, True),
     ("google/gemma-3n-e4b-it:free", "Gemma 3n 4B (FREE)", 8192, False),
     ("google/gemma-3-12b-it:free", "Gemma 3 12B (FREE)", 32768, True),
     ("google/gemma-3-27b-it:free", "Gemma 3 27B (FREE)", 131072, True),
     ("qwen/qwen3-4b:free", "Qwen3 4B (FREE)", 40960, False),
     ("qwen/qwen3-coder:free", "Qwen3 Coder 480B A35B (FREE)", 262000, True),
-    ("google/gemini-2.0-flash-exp", "Gemini 2.0 Flash (FREE)", 1000000, True),
-    ("google/gemini-1.5-flash", "Gemini 1.5 Flash (FREE)", 1000000, True),
-    ("google/gemini-1.5-flash-8b", "Gemini 1.5 Flash 8B (FREE)", 1000000, True),
     ("meta-llama/llama-3.1-8b-instruct", "Llama 3.1 8B (FREE)", 8192, False),
     ("mistralai/mistral-7b-instruct", "Mistral 7B (FREE)", 32768, False),
     ("google/gemma-3n-e4b-it", "Gemma 3n 4B (barato)", 32768, False),
@@ -159,7 +158,7 @@ class AIConfigService:
             config = CompanyAIConfig(
                 company_id=company_id,
                 provider_id=provider_id,
-                llm_model="google/gemini-1.5-flash",
+                llm_model="google/gemini-2.5-flash-lite",
                 temperature=0.7,
                 max_tokens=2048,
                 embedding_model="text-embedding-3-small",

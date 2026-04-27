@@ -26,6 +26,7 @@ CREATE TYPE ticket_status AS ENUM (
     'open',                  -- Aberto
     'pending_ai',            -- Aguardando aprovação AI
     'pending_agent',         -- Aguardando atendente
+    'pending_customer_feedback', -- Aguardando feedback do cliente
     'resolved',               -- Resolvido
     'closed',                -- Fechado
     'rejected'               -- Rejeitado

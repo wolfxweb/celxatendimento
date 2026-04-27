@@ -2,7 +2,9 @@
 AI response generation for tickets.
 """
 
+import io
 import json
+import os
 from datetime import datetime
 
 import httpx
@@ -13,9 +15,16 @@ from app.core.security import decrypt_api_key
 from app.database import AsyncSessionLocal
 from app.models.company_ai_config import CompanyAIConfig
 from app.models.ticket import Ticket
+from app.models.ticket_attachment import TicketAttachment
 from app.models.ticket_ai_response import TicketAIResponse
 from app.models.user import User
 from app.services.rag_service import RAGService
+
+LEGACY_LLM_MODEL_REPLACEMENTS = {
+    "google/gemini-1.5-flash": "google/gemini-2.5-flash-lite",
+    "google/gemini-1.5-flash-8b": "google/gemini-2.5-flash-lite",
+    "google/gemini-2.0-flash-exp": "google/gemini-2.5-flash-lite",
+}
 
 
 def _json_text(data: dict) -> str:
@@ -31,11 +40,83 @@ def parse_json_text(value):
     return value or {}
 
 
+def _extract_attachment_text(filename: str, content: bytes) -> str:
+    ext = os.path.splitext(filename)[1].lower()
+
+    if ext in {".txt", ".md"}:
+        return content.decode("utf-8", errors="replace").strip()
+
+    if ext == ".docx":
+        from docx import Document
+
+        document = Document(io.BytesIO(content))
+        return "\n".join(p.text for p in document.paragraphs if p.text.strip()).strip()
+
+    if ext == ".pdf":
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(content))
+        return "\n".join(page.extract_text() or "" for page in reader.pages).strip()
+
+    return ""
+
+
+async def _load_ticket_attachment_context(
+    db: AsyncSession,
+    ticket_id: int,
+) -> list[dict]:
+    result = await db.execute(
+        select(TicketAttachment).where(
+            and_(
+                TicketAttachment.ticket_id == ticket_id,
+                TicketAttachment.is_active == True,
+                TicketAttachment.deleted_at.is_(None),
+            )
+        )
+    )
+    attachments = result.scalars().all()
+    extracted = []
+
+    for attachment in attachments:
+        ext = os.path.splitext(attachment.original_filename)[1].lower()
+        if ext not in {".txt", ".md", ".pdf", ".docx"}:
+            continue
+
+        try:
+            with open(attachment.storage_path, "rb") as file:
+                content = file.read()
+            text = _extract_attachment_text(attachment.original_filename, content)
+        except Exception as exc:
+            extracted.append(
+                {
+                    "id": attachment.id,
+                    "filename": attachment.original_filename,
+                    "mime_type": attachment.mime_type,
+                    "content": "",
+                    "error": str(exc),
+                }
+            )
+            continue
+
+        if text:
+            extracted.append(
+                {
+                    "id": attachment.id,
+                    "filename": attachment.original_filename,
+                    "mime_type": attachment.mime_type,
+                    "content": text[:12000],
+                }
+            )
+
+    return extracted
+
+
 def _build_prompt(
     ticket: Ticket,
     customer: User | None,
     system_prompt: str,
     rag_sources: list[dict],
+    attachment_context: list[dict],
 ) -> str:
     context = "Nenhuma informação relevante encontrada na base de conhecimento."
     if rag_sources:
@@ -46,6 +127,15 @@ def _build_prompt(
 
     customer_name = customer.full_name if customer else "Cliente"
     customer_email = customer.email if customer else ""
+    attachments = "Nenhum anexo de texto/PDF com conteúdo extraído."
+    if attachment_context:
+        attachments = "\n\n".join(
+            (
+                f"Anexo: {attachment['filename']}\n"
+                f"{attachment.get('content') or 'Não foi possível extrair conteúdo deste anexo.'}"
+            )
+            for attachment in attachment_context
+        )
 
     return f"""
 {system_prompt}
@@ -63,10 +153,14 @@ Prioridade: {ticket.priority}
 Base de conhecimento:
 {context}
 
+Anexos do chamado:
+{attachments}
+
 Instruções:
 - Responda em português brasileiro.
 - Seja profissional, claro e útil.
-- Use a base de conhecimento quando ela trouxer uma solução aplicável.
+- Use a base de conhecimento e os anexos quando trouxerem informações aplicáveis.
+- Se houver conflito entre a descrição e os anexos, mencione que precisa de confirmação.
 - Não diga que a resposta já foi enviada ou aprovada.
 - Se faltarem informações, peça objetivamente o que é necessário.
 """.strip()
@@ -117,6 +211,7 @@ async def _call_openrouter_chat(
 async def generate_pending_ai_response(
     db: AsyncSession,
     ticket_id: int,
+    replace_pending: bool = False,
 ) -> dict:
     ticket_result = await db.execute(select(Ticket).where(Ticket.id == ticket_id))
     ticket = ticket_result.scalar_one_or_none()
@@ -135,6 +230,14 @@ async def generate_pending_ai_response(
     if not ai_config or not ai_config.api_key_is_set or not ai_config.api_key_encrypted:
         return {"status": "error", "message": "AI not configured"}
 
+    llm_model = LEGACY_LLM_MODEL_REPLACEMENTS.get(
+        ai_config.llm_model,
+        ai_config.llm_model,
+    )
+    if llm_model != ai_config.llm_model:
+        ai_config.llm_model = llm_model
+        await db.commit()
+
     existing_result = await db.execute(
         select(TicketAIResponse).where(
             and_(
@@ -143,8 +246,12 @@ async def generate_pending_ai_response(
             )
         )
     )
-    if existing_result.scalar_one_or_none():
+    existing_response = existing_result.scalar_one_or_none()
+    if existing_response and not replace_pending:
         return {"status": "skipped", "message": "Pending AI response already exists"}
+    if existing_response and replace_pending:
+        await db.delete(existing_response)
+        await db.flush()
 
     customer_result = await db.execute(select(User).where(User.id == ticket.user_id))
     customer = customer_result.scalar_one_or_none()
@@ -158,6 +265,7 @@ async def generate_pending_ai_response(
         query=f"{ticket.subject} {ticket.description}",
         top_k=5,
     )
+    attachment_context = await _load_ticket_attachment_context(db, ticket.id)
 
     api_key = decrypt_api_key(ai_config.api_key_encrypted)
     prompt = _build_prompt(
@@ -165,12 +273,13 @@ async def generate_pending_ai_response(
         customer=customer,
         system_prompt=ai_config.system_prompt,
         rag_sources=rag_sources,
+        attachment_context=attachment_context,
     )
 
     try:
         response_text, processing_time_ms = await _call_openrouter_chat(
             api_key=api_key,
-            model=ai_config.llm_model,
+            model=llm_model,
             temperature=ai_config.temperature,
             prompt=prompt,
         )
@@ -181,13 +290,14 @@ async def generate_pending_ai_response(
             context_used=_json_text(
                 {
                     "rag_sources": rag_sources,
+                    "attachments": attachment_context,
                     "ticket_subject": ticket.subject,
                     "ticket_category": ticket.category_id,
                 }
             ),
             config_snapshot=_json_text(
                 {
-                    "model": ai_config.llm_model,
+                    "model": llm_model,
                     "temperature": ai_config.temperature,
                     "autonomy_level": ai_config.autonomy_level,
                     "tools_used": ["rag"],
@@ -212,6 +322,9 @@ async def generate_pending_ai_response(
         return {"status": "error", "message": str(exc)}
 
 
-async def generate_pending_ai_response_background(ticket_id: int) -> None:
+async def generate_pending_ai_response_background(
+    ticket_id: int,
+    replace_pending: bool = False,
+) -> None:
     async with AsyncSessionLocal() as db:
-        await generate_pending_ai_response(db, ticket_id)
+        await generate_pending_ai_response(db, ticket_id, replace_pending=replace_pending)

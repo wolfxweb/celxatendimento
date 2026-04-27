@@ -38,6 +38,7 @@ class Ticket(Base, TimestampMixin):
             "open",
             "pending_ai",
             "pending_agent",
+            "pending_customer_feedback",
             "resolved",
             "closed",
             "rejected",

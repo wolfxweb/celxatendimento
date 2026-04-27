@@ -15,6 +15,7 @@ class TicketStatus(str, Enum):
     OPEN = "open"
     PENDING_AI = "pending_ai"
     PENDING_AGENT = "pending_agent"
+    PENDING_CUSTOMER_FEEDBACK = "pending_customer_feedback"
     RESOLVED = "resolved"
     CLOSED = "closed"
     REJECTED = "rejected"

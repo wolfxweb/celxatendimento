@@ -40,6 +40,7 @@ celery==5.3.6
 
 # File Processing
 python-docx==1.1.0
+pypdf==4.3.1
 openpyxl==3.1.2
 aiofiles==23.2.1
 

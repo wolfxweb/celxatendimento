@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 from typing import Optional, List
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, UploadFile, File, Query
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.ticket import Ticket
 from app.services.attachment_service import AttachmentService
+from app.services.ticket_ai_service import generate_pending_ai_response_background
 from app.schemas.ticket import AttachmentResponse, AttachmentListResponse, AttachmentsUploadResponse
 
 router = APIRouter(prefix="/tickets", tags=["attachments"])
@@ -49,6 +50,7 @@ def _validate_file_size(size: int, filename: str) -> tuple[bool, str]:
 @router.post("/{ticket_id}/attachments", response_model=AttachmentsUploadResponse, status_code=status.HTTP_201_CREATED)
 async def upload_attachments(
     ticket_id: str,
+    background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
@@ -116,6 +118,11 @@ async def upload_attachments(
             company_id=ticket.company_id,
             files=files_data,
             uploaded_by=current_user.id,
+        )
+        background_tasks.add_task(
+            generate_pending_ai_response_background,
+            ticket.id,
+            True,
         )
 
         return AttachmentsUploadResponse(
