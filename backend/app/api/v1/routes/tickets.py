@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request
 from sqlalchemy import select, and_, or_, cast, String
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -12,6 +12,10 @@ from app.models.ticket_message import TicketMessage
 from app.models.ticket_ai_response import TicketAIResponse
 from app.models.user import User
 from app.models.category import Category
+from app.services.ticket_ai_service import (
+    generate_pending_ai_response_background,
+    parse_json_text,
+)
 from app.schemas.ticket import (
     TicketCreate,
     TicketResponse,
@@ -67,6 +71,7 @@ async def get_ai_feedback_stats(
 async def create_ticket(
     ticket_data: TicketCreate,
     request: Request,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -140,6 +145,8 @@ async def create_ticket(
     await db.commit()
     await db.refresh(ticket)
 
+    background_tasks.add_task(generate_pending_ai_response_background, ticket.id)
+
     return ticket
 
 
@@ -206,15 +213,48 @@ async def list_tickets(
             )
             assignee_name = user_result.scalar_one_or_none()
 
+        customer_name = None
+        user_result = await db.execute(
+            select(User.full_name).where(User.id == ticket.user_id)
+        )
+        customer_name = user_result.scalar_one_or_none()
+
+        ai_response_data = None
+        ai_result = await db.execute(
+            select(TicketAIResponse)
+            .where(
+                and_(
+                    TicketAIResponse.ticket_id == ticket.id,
+                    TicketAIResponse.status == "pending",
+                )
+            )
+            .order_by(TicketAIResponse.created_at.desc())
+        )
+        ai_response = ai_result.scalars().first()
+        if ai_response:
+            ai_response_data = {
+                "id": ai_response.id,
+                "response_text": ai_response.response_text,
+                "context_used": parse_json_text(ai_response.context_used),
+                "generated_at": ai_response.generated_at,
+                "processing_time_ms": ai_response.processing_time_ms,
+                "ai_rating": ai_response.ai_rating,
+                "is_example_good": ai_response.is_example_good,
+                "is_example_bad": ai_response.is_example_bad,
+            }
+
         response.append(
             TicketListResponse(
                 id=ticket.id,
                 ticket_number=ticket.ticket_number,
                 subject=ticket.subject,
+                description=ticket.description,
                 status=ticket.status,
                 priority=ticket.priority,
+                customer_name=customer_name,
                 category_name=category_name,
                 assignee_name=assignee_name,
+                ai_response=ai_response_data,
                 created_at=ticket.created_at,
             )
         )

@@ -62,10 +62,13 @@ class TicketListResponse(BaseModel):
     id: int
     ticket_number: str
     subject: str
+    description: Optional[str] = None
     status: str
     priority: str
+    customer_name: Optional[str] = None
     category_name: Optional[str] = None
     assignee_name: Optional[str] = None
+    ai_response: Optional[dict] = None
     created_at: datetime
 
     class Config:

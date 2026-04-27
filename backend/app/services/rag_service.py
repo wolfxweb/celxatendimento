@@ -2,13 +2,17 @@
 RAG Service for Knowledge Base management and search
 """
 
+import json
 import uuid
 from datetime import datetime
 from typing import Optional
 
+import httpx
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import decrypt_api_key
+from app.models.company_ai_config import CompanyAIConfig
 from app.models.knowledge_base import KnowledgeBase
 
 
@@ -35,7 +39,7 @@ class RAGService:
             content=content,
             source_type=source_type,
             source_url=source_url,
-            metadata=metadata or {},
+            extra_data=json.dumps(metadata or {}),
             is_active=True,
             is_indexed=False,
         )
@@ -224,6 +228,115 @@ class RAGService:
 
         await self.db.commit()
         return True
+
+    async def recreate_embedding(
+        self,
+        article_id: int,
+        ai_config: CompanyAIConfig,
+    ) -> KnowledgeBase:
+        """Remove any existing embedding and generate a fresh one."""
+
+        article = await self.get_article(article_id)
+        if not article:
+            raise ValueError("Article not found")
+
+        article.embedding = None
+        article.is_indexed = False
+        article.index_error = None
+        article.last_indexed_at = None
+        await self.db.flush()
+
+        if not ai_config.api_key_is_set or not ai_config.api_key_encrypted:
+            article.index_error = "Chave de API não configurada"
+            article.last_indexed_at = datetime.now()
+            await self.db.commit()
+            raise ValueError(article.index_error)
+
+        api_key = decrypt_api_key(ai_config.api_key_encrypted)
+        model = ai_config.embedding_model or "text-embedding-3-small"
+
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                response = await client.post(
+                    "https://openrouter.ai/api/v1/embeddings",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": model,
+                        "input": article.content,
+                    },
+                )
+
+            if response.status_code >= 400:
+                try:
+                    detail = response.json()
+                except ValueError:
+                    detail = response.text
+                raise ValueError(f"OpenRouter retornou {response.status_code}: {detail}")
+
+            payload = response.json()
+            embedding = payload.get("data", [{}])[0].get("embedding")
+            if not embedding:
+                raise ValueError("OpenRouter não retornou embedding para este artigo")
+
+            article.embedding = json.dumps(embedding)
+            article.is_indexed = True
+            article.index_error = None
+            article.last_indexed_at = datetime.now()
+            await self.db.commit()
+            await self.db.refresh(article)
+            return article
+        except Exception as exc:
+            article.embedding = None
+            article.is_indexed = False
+            article.index_error = str(exc)
+            article.last_indexed_at = datetime.now()
+            await self.db.commit()
+            raise
+
+    async def recreate_embeddings_for_company(
+        self,
+        company_id: uuid.UUID,
+        ai_config: CompanyAIConfig,
+    ) -> dict:
+        """Recreate embeddings for every active article in a company."""
+
+        articles = await self.get_articles_by_company(company_id, include_inactive=False)
+        results = []
+        recreated = 0
+        failed = 0
+
+        for article in articles:
+            try:
+                indexed_article = await self.recreate_embedding(article.id, ai_config)
+                results.append(
+                    {
+                        "id": indexed_article.id,
+                        "title": indexed_article.title,
+                        "is_indexed": indexed_article.is_indexed,
+                        "index_error": indexed_article.index_error,
+                    }
+                )
+                recreated += 1
+            except Exception as exc:
+                results.append(
+                    {
+                        "id": article.id,
+                        "title": article.title,
+                        "is_indexed": False,
+                        "index_error": str(exc),
+                    }
+                )
+                failed += 1
+
+        return {
+            "total": len(articles),
+            "recreated": recreated,
+            "failed": failed,
+            "articles": results,
+        }
 
     async def get_indexing_status(self, company_id: uuid.UUID) -> dict:
         """Get indexing status for all articles"""
