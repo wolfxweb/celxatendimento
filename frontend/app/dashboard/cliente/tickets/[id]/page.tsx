@@ -157,6 +157,7 @@ export default function TicketDetailPage() {
   const [error, setError] = useState('')
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   useEffect(() => {
     if (ticketId) {
@@ -333,6 +334,30 @@ export default function TicketDetailPage() {
     }
   }
 
+  async function handleStatusChange(newStatus: string) {
+    if (!confirm(`Deseja alterar o status para "${newStatus}"?`)) return
+
+    setUpdatingStatus(true)
+    try {
+      await apiPost(`/tickets/${ticketId}`, { status: newStatus })
+      loadTicket()
+    } catch (err) {
+      alert('Erro ao alterar status')
+    } finally {
+      setUpdatingStatus(false)
+    }
+  }
+
+  const STATUS_OPTIONS = [
+    { value: 'open', label: 'Aberto' },
+    { value: 'pending_ai', label: 'Pendente IA' },
+    { value: 'pending_agent', label: 'Pendente Agente' },
+    { value: 'pending_customer_feedback', label: 'Aguardando Feedback' },
+    { value: 'resolved', label: 'Resolvido' },
+    { value: 'closed', label: 'Fechado' },
+    { value: 'rejected', label: 'Rejeitado' },
+  ]
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -361,10 +386,16 @@ export default function TicketDetailPage() {
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <span className="text-sm font-mono text-slate-400">{ticket.ticket_number}</span>
-              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-sm font-medium ${statusStyle.bg} ${statusStyle.text}`}>
-                <span className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${statusStyle.gradient}`}></span>
-                {ticket.status.replace('_', ' ')}
-              </span>
+              <select
+                value={ticket.status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                disabled={updatingStatus}
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-sm font-medium border-0 cursor-pointer ${statusStyle.bg} ${statusStyle.text} ${updatingStatus ? 'opacity-50' : ''}`}
+              >
+                {STATUS_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </div>
             <h1 className="text-2xl font-bold text-slate-800">{ticket.subject}</h1>
             <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">

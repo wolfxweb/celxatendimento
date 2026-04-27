@@ -168,6 +168,7 @@ export default function AtendenteTicketDetailPage() {
 
   const [ticket, setTicket] = useState<TicketDetail | null>(null)
   const [agents, setAgents] = useState<Agent[]>([])
+  const [categories, setCategories] = useState<{id: number; name: string}[]>([])
   const [relations, setRelations] = useState<TicketRelation[]>([])
   const [auditLog, setAuditLog] = useState<AuditLog[]>([])
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -183,6 +184,7 @@ export default function AtendenteTicketDetailPage() {
     if (ticketId) {
       loadTicket()
       loadAgents()
+      loadCategories()
     }
   }, [ticketId])
 
@@ -204,6 +206,26 @@ export default function AtendenteTicketDetailPage() {
       setAgents(data)
     } catch (err) {
       console.error('Erro ao carregar agentes:', err)
+    }
+  }
+
+  async function loadCategories() {
+    try {
+      const data = await apiFetch<{categories: {id: number; name: string}[]}>('/categories/active')
+      setCategories(data.categories)
+    } catch (err) {
+      console.error('Erro ao carregar categorias:', err)
+    }
+  }
+
+  async function handleChangeCategory(categoryId: string) {
+    try {
+      await apiPatch(`/tickets/${ticketId}`, {
+        category_id: categoryId ? parseInt(categoryId) : null,
+      })
+      loadTicket()
+    } catch (err) {
+      alert('Erro ao alterar categoria')
     }
   }
 
@@ -457,6 +479,26 @@ export default function AtendenteTicketDetailPage() {
               </select>
             ) : (
               <span className="text-sm text-slate-500">{ticket.assignee_name || 'Não atribuído'}</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-slate-600">Categoria:</span>
+            {categories.length > 0 ? (
+              <select
+                value={ticket.category_id || ''}
+                onChange={(e) => handleChangeCategory(e.target.value)}
+                className="px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm text-slate-700 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+              >
+                <option value="">Sem categoria</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="text-sm text-slate-500">{ticket.category_name || 'Sem categoria'}</span>
             )}
           </div>
 
