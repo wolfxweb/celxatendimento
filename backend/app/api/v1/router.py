@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.routes import (
+    agents,
     auth,
     tickets,
     users,
@@ -23,3 +24,4 @@ api_router.include_router(categories.router)
 api_router.include_router(knowledge.router)
 api_router.include_router(plans.router)
 api_router.include_router(attachments.router)
+api_router.include_router(agents.router)

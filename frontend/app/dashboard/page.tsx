@@ -52,6 +52,14 @@ export default function DashboardPage() {
       badge: 'Pendente',
       badgeColor: 'bg-amber-500',
     },
+    {
+      href: '/dashboard/atendente/chat-kb',
+      title: 'Chat KB',
+      description: 'Consulte a base de conhecimento',
+      icon: '📚',
+      gradient: 'from-amber-500 to-orange-500',
+      bgGradient: 'hover:from-amber-600 hover:to-orange-600',
+    },
   ]
 
   if (loading) {
