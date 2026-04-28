@@ -18,7 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard/cliente/tickets', label: 'Meus Tickets', icon: '🎫', roles: ['admin', 'customer'] },
   { href: '/dashboard/atendente/tickets', label: 'Tickets', icon: '📋', roles: ['admin', 'agent'] },
   { href: '/dashboard/atendente/aprovacao', label: 'Aprovar IA', icon: '🤖', badge: true, roles: ['admin', 'agent'] },
-  { href: '/dashboard/atendente/chat-kb', label: 'Chat KB', icon: '📚', roles: ['admin', 'agent'] },
+  { href: '/dashboard/atendente/chat-kb', label: 'Chat Conhecimento', icon: '📚', roles: ['admin', 'agent'] },
   { href: '/dashboard/admin/usuarios', label: 'Usuários', icon: '👥', roles: ['admin'] },
   { href: '/dashboard/admin/categorias', label: 'Categorias', icon: '📁', roles: ['admin'] },
   { href: '/dashboard/admin/config-ia', label: 'Config IA', icon: '⚙️', roles: ['admin'] },

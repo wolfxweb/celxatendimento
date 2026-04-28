@@ -37,6 +37,8 @@ class KBQueryState(TypedDict):
     llm_model: str
     temperature: float
     system_prompt: str
+    # Langfuse callbacks for tracing
+    callbacks: Optional[List[Any]]
     # Error handling
     error: Optional[str]
     retry_count: int
@@ -71,12 +73,16 @@ def create_kb_query_agent(
     Create a knowledge base query agent with LangGraph
     """
 
-    # Initialize LLM
+    # Initialize LLM with callbacks for Langfuse tracing
     llm = ChatOpenAI(
         api_key=api_key,
         model=model,
         temperature=temperature,
     )
+
+    # Wrap LLM with callbacks if provided
+    if callbacks:
+        llm = llm.with_config({"callbacks": callbacks})
 
     # Build the graph
     workflow = StateGraph(KBQueryState)
@@ -209,8 +215,8 @@ Informe o nível de confiança na resposta.
 Responda em português brasileiro.
 """
 
-        # Generate response
-        response = await llm.ainvoke(prompt, config={"callbacks": callbacks} if callbacks else {})
+        # Generate response (callbacks already set in LLM via with_config)
+        response = await llm.ainvoke(prompt)
         generated_text = (
             response.content if hasattr(response, "content") else str(response)
         )
@@ -356,6 +362,7 @@ async def process_kb_query(
         "llm_model": agent_config.get("llm_model", "google/gemini-2.5-flash-lite"),
         "temperature": agent_config.get("temperature", 0.7),
         "system_prompt": agent_config.get("system_prompt", DEFAULT_KB_SYSTEM_PROMPT),
+        "callbacks": callbacks,
         "error": None,
         "retry_count": 0,
     }

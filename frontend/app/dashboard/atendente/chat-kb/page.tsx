@@ -158,7 +158,7 @@ export default function ChatKBPage() {
         <div>
           <h1 className="text-2xl font-bold">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-600">
-              Chat com Base de Conhecimento
+              Chat Base de Conhecimento
             </span>
           </h1>
           <p className="text-slate-500 text-sm">
@@ -209,7 +209,7 @@ export default function ChatKBPage() {
                     📚
                   </div>
                   <h3 className="text-xl font-semibold text-slate-700 mb-2">
-                    Bem-vindo ao Chat de Consulta KB
+                    Bem-vindo ao Chat de Conhecimento
                   </h3>
                   <p className="text-slate-500">
                     Digite sua pergunta para buscar informações na base de conhecimento.

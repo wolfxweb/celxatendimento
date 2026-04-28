@@ -146,17 +146,92 @@ class RAGService:
         top_k: int = 5,
     ) -> list[dict]:
         """
-        Search for similar articles using embeddings
-
-        In production, this would use pgvector or a vector database.
-        For now, we do simple text matching.
+        Search for similar articles using embeddings (vector similarity)
+        Falls back to keyword matching if embeddings not available.
         """
 
-        # Get all active articles for company
+        # First, try to use embeddings if available
         articles = await self.get_articles_by_company(
             company_id, include_inactive=False
         )
 
+        # Get articles that have embeddings
+        articles_with_embeddings = [
+            a for a in articles if a.embedding and a.is_indexed
+        ]
+
+        if articles_with_embeddings and articles_with_embeddings[0].embedding:
+            # Get embedding model from company config
+            from app.services.ai_config_service import AIConfigService
+            ai_service = AIConfigService(self.db)
+            ai_config = await ai_service.get_or_create_config(
+                int(company_id) if isinstance(company_id, uuid.UUID) else company_id
+            )
+
+            if ai_config and ai_config.api_key_is_set and ai_config.api_key_encrypted:
+                from app.core.security import decrypt_api_key
+                api_key = decrypt_api_key(ai_config.api_key_encrypted)
+                model = ai_config.embedding_model or "text-embedding-3-small"
+
+                # Generate query embedding
+                try:
+                    async with httpx.AsyncClient(timeout=60) as client:
+                        response = await client.post(
+                            "https://openrouter.ai/api/v1/embeddings",
+                            headers={
+                                "Authorization": f"Bearer {api_key}",
+                                "Content-Type": "application/json",
+                            },
+                            json={
+                                "model": model,
+                                "input": query,
+                            },
+                        )
+
+                    if response.status_code == 200:
+                        payload = response.json()
+                        query_embedding = payload.get("data", [{}])[0].get("embedding")
+
+                        if query_embedding:
+                            # Calculate cosine similarity for all articles
+                            results_with_scores = []
+                            for article in articles_with_embeddings:
+                                try:
+                                    article_embedding = json.loads(article.embedding)
+                                    similarity = self._cosine_similarity(
+                                        query_embedding, article_embedding
+                                    )
+                                    results_with_scores.append({
+                                        "article": article,
+                                        "score": similarity,
+                                    })
+                                except (json.JSONDecodeError, TypeError):
+                                    continue
+
+                            # Sort by similarity
+                            results_with_scores.sort(key=lambda x: x["score"], reverse=True)
+
+                            # Return top_k results
+                            results = []
+                            for item in results_with_scores[:top_k]:
+                                article = item["article"]
+                                results.append({
+                                    "id": article.id,
+                                    "title": article.title,
+                                    "content": article.content[:500] + "..."
+                                    if len(article.content) > 500
+                                    else article.content,
+                                    "score": round(item["score"], 3),
+                                    "source_type": article.source_type,
+                                })
+
+                            if results:
+                                return results
+                except Exception:
+                    # Fall back to keyword search on error
+                    pass
+
+        # Fallback: Simple keyword matching
         results = []
         query_lower = query.lower()
 
@@ -197,6 +272,20 @@ class RAGService:
         # Sort by score and return top_k
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:top_k]
+
+    def _cosine_similarity(self, vec1: list, vec2: list) -> float:
+        """Calculate cosine similarity between two vectors"""
+        if not vec1 or not vec2 or len(vec1) != len(vec2):
+            return 0.0
+
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        magnitude1 = sum(a * a for a in vec1) ** 0.5
+        magnitude2 = sum(b * b for b in vec2) ** 0.5
+
+        if magnitude1 == 0 or magnitude2 == 0:
+            return 0.0
+
+        return dot_product / (magnitude1 * magnitude2)
 
     async def mark_as_indexed(self, article_id: int) -> bool:
         """Mark an article as indexed in the vector store"""
