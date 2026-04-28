@@ -48,6 +48,7 @@ def create_ticket_agent(
     api_key: str,
     model: str = "google/gemini-1.5-flash",
     temperature: float = 0.7,
+    callbacks: list = None,
 ):
     """
     Create a ticket processing agent with LangGraph
@@ -173,7 +174,7 @@ async def generate_ai_response(state: AgentState) -> AgentState:
         """
 
         # Generate response
-        response = await llm.ainvoke(prompt)
+        response = await llm.ainvoke(prompt, config={"callbacks": callbacks} if callbacks else {})
         generated_text = (
             response.content if hasattr(response, "content") else str(response)
         )
@@ -349,6 +350,7 @@ async def process_ticket(
     ticket_data: dict,
     ai_config: dict,
     api_key: str,
+    callbacks: list = None,
 ) -> dict:
     """
     Main entry point to process a ticket with AI
@@ -402,10 +404,10 @@ async def process_ticket(
 
     # Create and run agent
     agent = create_ticket_agent(
-        api_key, initial_state["llm_model"], initial_state["temperature"]
+        api_key, initial_state["llm_model"], initial_state["temperature"], callbacks=callbacks
     )
 
-    result = await agent.ainvoke(initial_state)
+    result = await agent.ainvoke(initial_state, config={"callbacks": callbacks} if callbacks else {})
 
     # Process result
     if result.get("error") and result["retry_count"] >= 3:

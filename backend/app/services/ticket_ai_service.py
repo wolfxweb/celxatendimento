@@ -19,6 +19,7 @@ from app.models.ticket_attachment import TicketAttachment
 from app.models.ticket_ai_response import TicketAIResponse
 from app.models.user import User
 from app.services.rag_service import RAGService
+from app.ai.callbacks import get_langfuse_callbacks, get_langfuse_client
 
 LEGACY_LLM_MODEL_REPLACEMENTS = {
     "google/gemini-1.5-flash": "google/gemini-2.5-flash-lite",
@@ -171,6 +172,8 @@ async def _call_openrouter_chat(
     model: str,
     temperature: float,
     prompt: str,
+    callbacks: list = None,
+    trace_metadata: dict | None = None,
 ) -> tuple[str, int]:
     start = datetime.now()
 
@@ -205,6 +208,24 @@ async def _call_openrouter_chat(
         raise ValueError("OpenRouter não retornou conteúdo para a resposta")
 
     processing_time_ms = int((datetime.now() - start).total_seconds() * 1000)
+    langfuse = get_langfuse_client()
+    if langfuse:
+        try:
+            trace = langfuse.trace(
+                name="ticket-ai-response",
+                metadata=trace_metadata or {},
+            )
+            trace.generation(
+                name="openrouter-chat-completion",
+                model=model,
+                input=prompt,
+                output=content,
+                model_parameters={"temperature": temperature},
+            )
+            langfuse.flush()
+        except Exception:
+            pass
+
     return content.strip(), processing_time_ms
 
 
@@ -277,11 +298,20 @@ async def generate_pending_ai_response(
     )
 
     try:
+        langfuse_callbacks = get_langfuse_callbacks()
         response_text, processing_time_ms = await _call_openrouter_chat(
             api_key=api_key,
             model=llm_model,
             temperature=ai_config.temperature,
             prompt=prompt,
+            callbacks=langfuse_callbacks,
+            trace_metadata={
+                "ticket_id": ticket.id,
+                "ticket_number": ticket.ticket_number,
+                "company_id": ticket.company_id,
+                "category_id": ticket.category_id,
+                "priority": ticket.priority,
+            },
         )
 
         ai_response = TicketAIResponse(

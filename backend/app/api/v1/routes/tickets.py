@@ -1,4 +1,5 @@
 from datetime import date, datetime, time
+import json
 from typing import Optional, Union
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request
 from sqlalchemy import select, and_, or_, cast, String, func
@@ -30,6 +31,8 @@ from app.schemas.ticket import (
     AIResponseApprove,
     AIResponseReject,
     AIResponseEdit,
+    AIResponseFeedback,
+    AIResponseExample,
 )
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
@@ -687,8 +690,8 @@ async def reject_ai_response(
         ai_response_id=ai_response.id,
         agent_id=current_user.id,
         action="rejected",
-        previous_state={"status": "pending"},
-        new_state={"status": "rejected"},
+        previous_state=json.dumps({"status": "pending"}, ensure_ascii=False),
+        new_state=json.dumps({"status": "rejected"}, ensure_ascii=False),
         rejection_reason=rejection.rejection_reason,
     )
     db.add(feedback_log)
@@ -804,10 +807,7 @@ async def delete_ticket(
 @router.post("/{ticket_id}/ai/feedback", status_code=status.HTTP_200_OK)
 async def submit_ai_feedback(
     ticket_id: str,
-    rating: int,
-    feedback: Optional[str] = None,
-    is_example_good: bool = False,
-    is_example_bad: bool = False,
+    feedback_data: AIResponseFeedback,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -826,22 +826,16 @@ async def submit_ai_feedback(
             detail="Only agents and admins can submit AI feedback",
         )
 
-    if not 1 <= rating <= 5:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Rating must be between 1 and 5",
-        )
-
     from app.services.ai_feedback_service import AIFeedbackService
 
     service = AIFeedbackService(db)
     result = await service.submit_feedback(
         ticket_id=int(ticket_id),
         agent_id=current_user.id,
-        rating=rating,
-        feedback_text=feedback,
-        is_example_good=is_example_good,
-        is_example_bad=is_example_bad,
+        rating=feedback_data.rating,
+        feedback_text=feedback_data.feedback,
+        is_example_good=feedback_data.is_example_good,
+        is_example_bad=feedback_data.is_example_bad,
     )
 
     if result["status"] == "error":
@@ -856,8 +850,7 @@ async def submit_ai_feedback(
 @router.post("/{ticket_id}/ai/example", status_code=status.HTTP_200_OK)
 async def mark_ai_as_example(
     ticket_id: str,
-    is_good: bool,
-    reason: Optional[str] = None,
+    example: AIResponseExample,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -877,8 +870,8 @@ async def mark_ai_as_example(
     result = await service.mark_as_example(
         ticket_id=int(ticket_id),
         agent_id=current_user.id,
-        is_good=is_good,
-        reason=reason,
+        is_good=example.is_good,
+        reason=example.reason,
     )
 
     if result["status"] == "error":

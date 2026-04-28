@@ -21,6 +21,7 @@ from app.models.ticket import Ticket
 from app.models.ticket_ai_response import TicketAIResponse
 from app.models.ticket_message import TicketMessage
 from app.models.company_ai_config import CompanyAIConfig
+from app.ai.callbacks import get_langfuse_callbacks
 
 
 async def get_db_session():

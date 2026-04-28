@@ -138,6 +138,18 @@ class AIResponseEdit(BaseModel):
     feedback: Optional[str] = None
 
 
+class AIResponseFeedback(BaseModel):
+    rating: int = Field(..., ge=1, le=5)
+    feedback: Optional[str] = None
+    is_example_good: bool = False
+    is_example_bad: bool = False
+
+
+class AIResponseExample(BaseModel):
+    is_good: bool
+    reason: Optional[str] = None
+
+
 class TicketAssignmentRequest(BaseModel):
     assigned_to: int
     reason: str = "manual"

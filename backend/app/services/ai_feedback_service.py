@@ -5,6 +5,7 @@ Handles feedback collection for AI responses to improve the model over time.
 """
 
 import uuid
+import json
 from datetime import datetime
 from typing import Optional
 
@@ -96,8 +97,8 @@ class AIFeedbackService:
             ai_response_id=ai_response.id,
             agent_id=agent_id,
             action="rated",
-            previous_state=previous_state,
-            new_state=new_state,
+            previous_state=json.dumps(previous_state, ensure_ascii=False),
+            new_state=json.dumps(new_state, ensure_ascii=False),
             rating=rating,
             feedback_text=feedback_text,
         )

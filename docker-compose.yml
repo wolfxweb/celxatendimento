@@ -95,6 +95,10 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-sua-chave-32-bytes-aqui12345}
       OPENROUTER_API_URL: https://openrouter.ai/api/v1
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse:3000}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_ENABLE: ${LANGFUSE_ENABLE:-true}
       NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_PUBLIC_APP_URL: http://localhost:3000
     ports:
@@ -144,6 +148,10 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-sua-chave-32-bytes-aqui12345}
       OPENROUTER_API_URL: https://openrouter.ai/api/v1
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-http://langfuse:3000}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_ENABLE: ${LANGFUSE_ENABLE:-true}
     command: celery -A app.celery_app worker --loglevel=info
     volumes:
       - uploads_data:/app/uploads
@@ -156,12 +164,56 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.celery_app", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
           memory: 2G
         reservations:
           memory: 512M
+
+  # =====================================================
+  # LANGFUSE (Observabilidade de LLMs)
+  # =====================================================
+  langfuse:
+    image: langfuse/langfuse:2
+    container_name: celx-langfuse
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:-celx123456}@postgres:5432/langfuse
+      REDIS_URL: redis://redis:6379/1
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: ${LANGFUSE_SECRET:-langfuse-secret-change-in-production}
+      SALT: ${LANGFUSE_SALT:-langfuse-salt-change-in-production}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+    ports:
+      - "${LANGFUSE_PORT:-3001}:3000"
+    volumes:
+      - langfuse_data:/app/data
+    networks:
+      - celx-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "const os = require('os'); fetch('http://' + os.hostname() + ':3000/api/public/health').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
 
   # =====================================================
   # FRONTEND (Next.js)
@@ -209,3 +261,4 @@ volumes:
   pgadmin_data:
   redis_data:
   uploads_data:
+  langfuse_data:

@@ -50,6 +50,7 @@ export default function AprovacaoPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [processing, setProcessing] = useState<string | null>(null)
   const [feedbackMode, setFeedbackMode] = useState<string | null>(null)
+  const [editedResponses, setEditedResponses] = useState<Record<string, string>>({})
   const [feedbackModal, setFeedbackModal] = useState<{
     ticketId: string
     rating: number
@@ -70,6 +71,14 @@ export default function AprovacaoPage() {
         apiFetch<FeedbackStats>('/tickets/ai/stats'),
       ])
       setTickets(ticketsData)
+      setEditedResponses(
+        ticketsData.reduce<Record<string, string>>((acc, ticket) => {
+          if (ticket.ai_response) {
+            acc[ticket.id] = ticket.ai_response.response_text
+          }
+          return acc
+        }, {})
+      )
       setStats(statsData)
     } catch (err) {
       setError('Erro ao carregar dados')
@@ -78,13 +87,20 @@ export default function AprovacaoPage() {
     }
   }
 
-  async function handleApprove(ticketId: string) {
+  async function handleApprove(ticketId: string, responseText?: string, originalText?: string) {
     setProcessing(ticketId)
     try {
-      await apiPost(`/tickets/${ticketId}/ai/approve`, {
-        rating: null,
-        feedback: null,
-      })
+      const editedText = responseText?.trim()
+      if (editedText && originalText && editedText !== originalText.trim()) {
+        await apiPost(`/tickets/${ticketId}/ai/edit`, {
+          edited_response: editedText,
+        })
+      } else {
+        await apiPost(`/tickets/${ticketId}/ai/approve`, {
+          rating: null,
+          feedback: null,
+        })
+      }
       loadData()
     } catch (err) {
       alert('Erro ao aprovar resposta')
@@ -107,23 +123,6 @@ export default function AprovacaoPage() {
       loadData()
     } catch (err) {
       alert('Erro ao rejeitar resposta')
-    } finally {
-      setProcessing(null)
-    }
-  }
-
-  async function handleEdit(ticketId: string) {
-    const newText = prompt('Digite a nova resposta:')
-    if (!newText) return
-
-    setProcessing(ticketId)
-    try {
-      await apiPost(`/tickets/${ticketId}/ai/edit`, {
-        edited_response: newText,
-      })
-      loadData()
-    } catch (err) {
-      alert('Erro ao editar resposta')
     } finally {
       setProcessing(null)
     }
@@ -346,10 +345,19 @@ export default function AprovacaoPage() {
                     
                     {isExpanded ? (
                       <div className="space-y-4">
-                        {/* Full response */}
-                        <div className="p-4 rounded-xl bg-white border border-slate-200 font-mono text-sm whitespace-pre-wrap">
-                          {ticket.ai_response.response_text}
-                        </div>
+                        {/* Editable response */}
+                        <textarea
+                          value={editedResponses[ticket.id] ?? ticket.ai_response.response_text}
+                          onChange={(event) =>
+                            setEditedResponses((current) => ({
+                              ...current,
+                              [ticket.id]: event.target.value,
+                            }))
+                          }
+                          disabled={processing === ticket.id}
+                          rows={12}
+                          className="w-full min-h-[320px] rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700 shadow-inner outline-none transition-all focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        />
                         
                         {/* RAG Context */}
                         {ticket.ai_response.context_used && (
@@ -371,18 +379,15 @@ export default function AprovacaoPage() {
                         {/* Action Buttons */}
                         <div className="flex gap-3 flex-wrap">
                           <button
-                            onClick={() => handleApprove(ticket.id)}
+                            onClick={() => handleApprove(
+                              ticket.id,
+                              editedResponses[ticket.id] ?? ticket.ai_response!.response_text,
+                              ticket.ai_response!.response_text
+                            )}
                             disabled={processing === ticket.id}
                             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium shadow-lg hover:shadow-glow-primary transition-all disabled:opacity-50"
                           >
                             <span>✓</span> Aprovar e Enviar
-                          </button>
-                          <button
-                            onClick={() => handleEdit(ticket.id)}
-                            disabled={processing === ticket.id}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium shadow-lg hover:shadow-glow-secondary transition-all disabled:opacity-50"
-                          >
-                            <span>✎</span> Editar
                           </button>
                           <button
                             onClick={() => handleReject(ticket.id)}
@@ -504,8 +509,8 @@ export default function AprovacaoPage() {
         )}
 
       {feedbackModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-card-hover border border-slate-100 overflow-hidden">
+        <div className="fixed left-0 top-0 right-0 bottom-0 z-[100] grid min-h-screen w-screen place-items-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="w-full max-w-lg max-h-[calc(100vh-2rem)] rounded-2xl bg-white shadow-card-hover border border-slate-100 overflow-hidden">
             <div className="p-6 border-b border-slate-100">
               <div className="flex items-start gap-4">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">

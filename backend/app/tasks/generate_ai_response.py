@@ -19,6 +19,7 @@ from app.models.ticket import Ticket
 from app.models.ticket_ai_response import TicketAIResponse
 from app.models.company_ai_config import CompanyAIConfig
 from app.agents.langgraph.ticket_agent import process_ticket
+from app.ai.callbacks import get_langfuse_callbacks
 
 
 async def generate_ai_response_task(
@@ -81,11 +82,15 @@ async def generate_ai_response_task(
             "system_prompt": ai_config.system_prompt,
         }
 
+        # Get Langfuse callbacks for tracing
+        langfuse_callbacks = get_langfuse_callbacks()
+
         # Process ticket with AI agent
         result = await process_ticket(
             ticket_data=ticket_data,
             ai_config=config,
             api_key=ai_config.api_key_encrypted,
+            callbacks=langfuse_callbacks,
         )
 
         if result["status"] == "error":

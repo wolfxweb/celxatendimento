@@ -26,8 +26,8 @@ class AIFeedbackLog(Base, TimestampMixin):
     )  # approved, rejected, edited, rated
 
     # Data
-    previous_state: Mapped[dict] = mapped_column(Text, nullable=True)
-    new_state: Mapped[dict] = mapped_column(Text, nullable=True)
+    previous_state: Mapped[str] = mapped_column(Text, nullable=True)
+    new_state: Mapped[str] = mapped_column(Text, nullable=True)
 
     # Feedback
     rating: Mapped[int] = mapped_column(Integer, nullable=True)

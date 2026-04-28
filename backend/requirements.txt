@@ -59,3 +59,6 @@ pytest==7.4.4
 pytest-asyncio==0.23.4
 pytest-cov==4.1.0
 httpx==0.26.0  # For test client
+
+# Langfuse
+langfuse>=2.0.0,<3.0.0
