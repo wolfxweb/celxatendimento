@@ -106,6 +106,16 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'Rejeitado',
 }
 
+const STATUS_OPTIONS = [
+  { value: 'open', label: 'Aberto' },
+  { value: 'pending_ai', label: 'Aprovação pendente' },
+  { value: 'pending_agent', label: 'Aguardando Atendente' },
+  { value: 'pending_customer_feedback', label: 'Aguardando feedback do cliente' },
+  { value: 'resolved', label: 'Resolvido' },
+  { value: 'closed', label: 'Fechado' },
+  { value: 'rejected', label: 'Rejeitado' },
+]
+
 const STATUS_STYLES: Record<string, { bg: string; text: string; gradient: string }> = {
   open: { bg: 'bg-blue-500/10', text: 'text-blue-600', gradient: 'from-blue-500 to-cyan-500' },
   pending_ai: { bg: 'bg-amber-500/10', text: 'text-amber-600', gradient: 'from-amber-500 to-orange-500' },
@@ -155,7 +165,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   rating_added: 'Avaliação adicionada',
 }
 
-type TabType = 'mensagens' | 'relacionados' | 'alteracoes' | 'anexos'
+type TabType = 'mensagens' | 'responder' | 'relacionados' | 'alteracoes' | 'anexos'
 
 const ALLOWED_FILE_TYPES = ['.jpg', '.jpeg', '.png', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.zip']
 const MAX_FILE_SIZE_MB = 10
@@ -179,6 +189,7 @@ export default function AtendenteTicketDetailPage() {
   const [newMessage, setNewMessage] = useState('')
   const [isInternal, setIsInternal] = useState(false)
   const [sending, setSending] = useState(false)
+  const [updatingStatus, setUpdatingStatus] = useState(false)
 
   useEffect(() => {
     if (ticketId) {
@@ -373,13 +384,18 @@ export default function AtendenteTicketDetailPage() {
   }
 
   async function handleChangeStatus(newStatus: string) {
+    if (!newStatus || newStatus === ticket?.status) return
+
     try {
+      setUpdatingStatus(true)
       await apiPatch(`/tickets/${ticketId}`, {
         status: newStatus,
       })
       loadTicket()
     } catch (err) {
       alert('Erro ao alterar status')
+    } finally {
+      setUpdatingStatus(false)
     }
   }
 
@@ -409,16 +425,25 @@ export default function AtendenteTicketDetailPage() {
   const statusStyle = STATUS_STYLES[ticket.status] || STATUS_STYLES.open
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       <div className="p-6 rounded-2xl bg-white shadow-card-modern border border-slate-100">
         <div className="flex justify-between items-start gap-4">
           <div className="space-y-3">
             <div className="flex items-center gap-3">
               <span className="text-sm font-mono text-slate-400">{ticket.ticket_number}</span>
-              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-sm font-medium ${statusStyle.bg} ${statusStyle.text}`}>
-                <span className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${statusStyle.gradient}`}></span>
-                {STATUS_LABELS[ticket.status] || ticket.status.replace('_', ' ')}
-              </span>
+              <select
+                value={ticket.status}
+                onChange={(e) => handleChangeStatus(e.target.value)}
+                disabled={updatingStatus}
+                className={`px-3 py-1.5 rounded-xl text-sm font-medium border border-transparent cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary-500/20 disabled:opacity-60 disabled:cursor-not-allowed ${statusStyle.bg} ${statusStyle.text}`}
+                aria-label="Alterar status do ticket"
+              >
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <h1 className="text-2xl font-bold text-slate-800">{ticket.subject}</h1>
             <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500">
@@ -553,7 +578,7 @@ export default function AtendenteTicketDetailPage() {
       <div className="rounded-2xl bg-white shadow-card-modern border border-slate-100 overflow-hidden">
         <div className="border-b border-slate-100">
           <div className="flex">
-            {(['mensagens', 'relacionados', 'alteracoes', 'anexos'] as TabType[]).map((tab) => (
+            {(['mensagens', 'responder', 'relacionados', 'alteracoes', 'anexos'] as TabType[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => handleTabChange(tab)}
@@ -563,7 +588,7 @@ export default function AtendenteTicketDetailPage() {
                     : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                {tab === 'anexos' ? `Anexos (${attachments.length})` : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'anexos' ? `Anexos (${attachments.length})` : tab === 'responder' ? 'Responder' : tab.charAt(0).toUpperCase() + tab.slice(1)}
                 {tab === 'mensagens' && ` (${ticket.messages.length})`}
               </button>
             ))}
@@ -636,6 +661,104 @@ export default function AtendenteTicketDetailPage() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {activeTab === 'responder' && (
+            <div>
+              {ticket.status !== 'closed' && ticket.status !== 'rejected' ? (
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-700 mb-4">Enviar Mensagem</h3>
+                  <form onSubmit={handleSendMessage}>
+                    <textarea
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      rows={4}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all resize-none"
+                      placeholder="Digite sua mensagem..."
+                    />
+
+                    {pendingFiles.length > 0 && (
+                      <div className="mt-3 space-y-2 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                        {pendingFiles.map(f => (
+                          <div key={f.id} className="flex items-center justify-between p-2 bg-white rounded border border-slate-100">
+                            <div className="flex items-center gap-2 min-w-0">
+                              {f.preview ? (
+                                <img src={f.preview} alt="" className="w-8 h-8 object-cover rounded" />
+                              ) : (
+                                <span className="text-lg">{getFileIcon(f.file.name)}</span>
+                              )}
+                              <span className="text-sm text-slate-600 truncate">{f.file.name}</span>
+                              <span className="text-xs text-slate-400">({formatFileSize(f.file.size)})</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removePendingFile(f.id)}
+                              className="p-1 text-slate-400 hover:text-red-500"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <input
+                          type="file"
+                          ref={fileInputRef}
+                          multiple
+                          accept={ALLOWED_FILE_TYPES.join(',')}
+                          onChange={handleFileSelect}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm"
+                        >
+                          📎 Anexar arquivos
+                        </button>
+                        {pendingFiles.length > 0 && (
+                          <span className="text-xs text-slate-400">{pendingFiles.length} arquivo(s) pendente(s)</span>
+                        )}
+                        <label className="flex items-center gap-2 text-sm text-slate-600">
+                          <input
+                            type="checkbox"
+                            checked={isInternal}
+                            onChange={(e) => setIsInternal(e.target.checked)}
+                            className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                          />
+                          Nota interna
+                        </label>
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={sending}
+                        className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-primary text-white font-medium shadow-lg hover:shadow-glow-primary transition-all disabled:opacity-50"
+                      >
+                        {sending ? (
+                          <>
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                            Enviando...
+                          </>
+                        ) : (
+                          <>
+                            <span>➤</span>
+                            Enviar
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="text-5xl mb-3">🔒</div>
+                  <p className="text-slate-500">Este ticket não aceita novas mensagens</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -774,95 +897,6 @@ export default function AtendenteTicketDetailPage() {
           )}
         </div>
       </div>
-
-      {ticket.status !== 'closed' && ticket.status !== 'rejected' && (
-        <div className="p-6 rounded-2xl bg-white shadow-card-modern border border-slate-100">
-          <h3 className="text-lg font-semibold text-slate-700 mb-4">Enviar Mensagem</h3>
-          <form onSubmit={handleSendMessage}>
-            <textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              rows={4}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all resize-none"
-              placeholder="Digite sua mensagem..."
-            />
-
-            {pendingFiles.length > 0 && (
-              <div className="mt-3 space-y-2 p-3 rounded-lg bg-slate-50 border border-slate-200">
-                {pendingFiles.map(f => (
-                  <div key={f.id} className="flex items-center justify-between p-2 bg-white rounded border border-slate-100">
-                    <div className="flex items-center gap-2 min-w-0">
-                      {f.preview ? (
-                        <img src={f.preview} alt="" className="w-8 h-8 object-cover rounded" />
-                      ) : (
-                        <span className="text-lg">{getFileIcon(f.file.name)}</span>
-                      )}
-                      <span className="text-sm text-slate-600 truncate">{f.file.name}</span>
-                      <span className="text-xs text-slate-400">({formatFileSize(f.file.size)})</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removePendingFile(f.id)}
-                      className="p-1 text-slate-400 hover:text-red-500"
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-              <div className="flex flex-wrap items-center gap-3">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  multiple
-                  accept={ALLOWED_FILE_TYPES.join(',')}
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm"
-                >
-                  📎 Anexar arquivos
-                </button>
-                {pendingFiles.length > 0 && (
-                  <span className="text-xs text-slate-400">{pendingFiles.length} arquivo(s) pendente(s)</span>
-                )}
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={isInternal}
-                    onChange={(e) => setIsInternal(e.target.checked)}
-                    className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
-                  />
-                  Nota interna
-                </label>
-              </div>
-              <button
-                type="submit"
-                disabled={sending}
-                className="flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-primary text-white font-medium shadow-lg hover:shadow-glow-primary transition-all disabled:opacity-50"
-              >
-                {sending ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    <span>➤</span>
-                    Enviar
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
     </div>
   )
 }

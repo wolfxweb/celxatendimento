@@ -1,7 +1,7 @@
-from datetime import datetime
-from typing import Optional
+from datetime import date, datetime, time
+from typing import Optional, Union
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status, Request
-from sqlalchemy import select, and_, or_, cast, String
+from sqlalchemy import select, and_, or_, cast, String, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -21,6 +21,7 @@ from app.schemas.ticket import (
     TicketResponse,
     TicketUpdate,
     TicketListResponse,
+    TicketListPaginatedResponse,
     TicketDetailResponse,
     MessageResponse,
     MessageCreate,
@@ -150,13 +151,18 @@ async def create_ticket(
     return ticket
 
 
-@router.get("", response_model=list[TicketListResponse], include_in_schema=False)
-@router.get("/", response_model=list[TicketListResponse])
+@router.get("", response_model=Union[list[TicketListResponse], TicketListPaginatedResponse], include_in_schema=False)
+@router.get("/", response_model=Union[list[TicketListResponse], TicketListPaginatedResponse])
 async def list_tickets(
     status: Optional[str] = None,
     assigned_to: Optional[str] = None,
+    category_id: Optional[int] = None,
+    customer_name: Optional[str] = None,
+    date_from: Optional[date] = None,
+    date_to: Optional[date] = None,
     limit: int = 50,
     offset: int = 0,
+    paginated: bool = False,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -186,8 +192,35 @@ async def list_tickets(
     if status:
         # Cast status to VARCHAR for comparison with ENUM
         query = query.where(cast(Ticket.status, String) == status)
-    if assigned_to:
+    if assigned_to == "unassigned":
+        query = query.where(Ticket.assigned_to.is_(None))
+    elif assigned_to:
         query = query.where(Ticket.assigned_to == int(assigned_to))
+    if category_id:
+        query = query.where(Ticket.category_id == category_id)
+    if customer_name:
+        customer_filter = f"%{customer_name.strip()}%"
+        customer_ids = select(User.id).where(
+            and_(
+                User.company_id == company_id,
+                cast(User.role, String) == "customer",
+                or_(
+                    User.full_name.ilike(customer_filter),
+                    User.email.ilike(customer_filter),
+                ),
+            )
+        )
+        query = query.where(Ticket.user_id.in_(customer_ids))
+    if date_from:
+        query = query.where(Ticket.created_at >= datetime.combine(date_from, time.min))
+    if date_to:
+        query = query.where(Ticket.created_at <= datetime.combine(date_to, time.max))
+
+    total = None
+    if paginated:
+        count_query = select(func.count()).select_from(query.order_by(None).subquery())
+        count_result = await db.execute(count_query)
+        total = count_result.scalar() or 0
 
     query = query.order_by(Ticket.created_at.desc()).limit(limit).offset(offset)
 
@@ -257,6 +290,14 @@ async def list_tickets(
                 ai_response=ai_response_data,
                 created_at=ticket.created_at,
             )
+        )
+
+    if paginated:
+        return TicketListPaginatedResponse(
+            tickets=response,
+            total=total or 0,
+            limit=limit,
+            offset=offset,
         )
 
     return response

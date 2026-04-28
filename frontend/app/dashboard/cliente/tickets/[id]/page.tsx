@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
-import { apiFetch, apiPost, apiUpload } from '@/lib/api'
+import { apiFetch, apiPatch, apiPost, apiUpload } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -158,6 +158,7 @@ export default function TicketDetailPage() {
   const [newMessage, setNewMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null)
 
   useEffect(() => {
     if (ticketId) {
@@ -335,11 +336,17 @@ export default function TicketDetailPage() {
   }
 
   async function handleStatusChange(newStatus: string) {
-    if (!confirm(`Deseja alterar o status para "${newStatus}"?`)) return
+    if (!ticket || newStatus === ticket.status) return
+    setPendingStatus(newStatus)
+  }
+
+  async function confirmStatusChange() {
+    if (!pendingStatus) return
 
     setUpdatingStatus(true)
     try {
-      await apiPost(`/tickets/${ticketId}`, { status: newStatus })
+      await apiPatch(`/tickets/${ticketId}`, { status: pendingStatus })
+      setPendingStatus(null)
       loadTicket()
     } catch (err) {
       alert('Erro ao alterar status')
@@ -782,6 +789,43 @@ export default function TicketDetailPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {pendingStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-card-hover border border-slate-100 overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                  <span className="text-xl">↻</span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Alterar status</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Deseja alterar o status para &quot;{STATUS_OPTIONS.find((option) => option.value === pendingStatus)?.label || pendingStatus}&quot;?
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-4 bg-slate-50">
+              <button
+                onClick={() => setPendingStatus(null)}
+                disabled={updatingStatus}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmStatusChange}
+                disabled={updatingStatus}
+                className="px-4 py-2 rounded-lg bg-gradient-primary text-white text-sm font-semibold shadow-lg hover:shadow-glow-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {updatingStatus ? 'Alterando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

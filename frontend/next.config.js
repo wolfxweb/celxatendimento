@@ -1,6 +1,4 @@
 /** @type {import('next').NextConfig} */
-const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-
 const nextConfig = {
   reactStrictMode: true,
 
@@ -8,35 +6,35 @@ const nextConfig = {
     return [
       {
         source: '/api/v1/companies/:path*',
-        destination: `${apiUrl}/api/v1/companies/:path*`,
+        destination: 'http://backend:8000/api/v1/companies/:path*',
       },
       {
         source: '/api/v1/tickets/:path*',
-        destination: `${apiUrl}/api/v1/tickets/:path*`,
+        destination: 'http://backend:8000/api/v1/tickets/:path*',
       },
       {
         source: '/api/v1/categories/:path*',
-        destination: `${apiUrl}/api/v1/categories/:path*`,
+        destination: 'http://backend:8000/api/v1/categories/:path*',
       },
       {
         source: '/api/v1/users/:path*',
-        destination: `${apiUrl}/api/v1/users/:path*`,
+        destination: 'http://backend:8000/api/v1/users/:path*',
       },
       {
         source: '/api/v1/knowledge/:path*',
-        destination: `${apiUrl}/api/v1/knowledge/:path*`,
+        destination: 'http://backend:8000/api/v1/knowledge/:path*',
       },
       {
         source: '/api/v1/ai-config/:path*',
-        destination: `${apiUrl}/api/v1/ai-config/:path*`,
+        destination: 'http://backend:8000/api/v1/ai-config/:path*',
       },
       {
         source: '/api/v1/plans/:path*',
-        destination: `${apiUrl}/api/v1/plans/:path*`,
+        destination: 'http://backend:8000/api/v1/plans/:path*',
       },
       {
         source: '/api/v1/:path*',
-        destination: `${apiUrl}/api/v1/:path*`,
+        destination: 'http://backend:8000/api/v1/:path*',
       },
     ]
   },

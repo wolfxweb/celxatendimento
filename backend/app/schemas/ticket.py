@@ -75,6 +75,13 @@ class TicketListResponse(BaseModel):
         from_attributes = True
 
 
+class TicketListPaginatedResponse(BaseModel):
+    tickets: list[TicketListResponse]
+    total: int
+    limit: int
+    offset: int
+
+
 class MessageBase(BaseModel):
     content: str
 
