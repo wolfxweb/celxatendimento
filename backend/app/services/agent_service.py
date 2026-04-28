@@ -17,6 +17,7 @@ from sqlalchemy.orm import selectinload
 from app.models.agent_config import AgentConfig, AgentType, AutonomyLevel
 from app.models.agent_prompt import AgentPrompt, PromptType
 from app.models.company_ai_config import CompanyAIConfig
+from app.ai.callbacks import get_langfuse_client
 from app.services.rag_service import RAGService
 
 
@@ -60,6 +61,51 @@ class AgentService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.rag_service = RAGService(db)
+
+    def _trace_chat_kb(
+        self,
+        *,
+        query: str,
+        response: str,
+        agent: AgentConfig,
+        company_id: int,
+        user_id: Optional[str],
+        user_name: Optional[str],
+        sources: List[dict],
+        confidence: str,
+        processing_time_ms: Optional[int],
+        mode: str,
+    ) -> None:
+        langfuse = get_langfuse_client()
+        if not langfuse:
+            return
+
+        try:
+            trace = langfuse.trace(
+                name="chat-kb",
+                user_id=user_id or "unknown",
+                metadata={
+                    "company_id": company_id,
+                    "agent_id": str(agent.id),
+                    "agent_name": agent.name,
+                    "user_name": user_name,
+                    "confidence": confidence,
+                    "processing_time_ms": processing_time_ms,
+                    "mode": mode,
+                    "sources_count": len(sources),
+                },
+            )
+            trace.generation(
+                name="chat-kb-response",
+                model=agent.llm_model,
+                input=query,
+                output=response,
+                model_parameters={"temperature": agent.temperature},
+                metadata={"sources": sources},
+            )
+            langfuse.flush()
+        except Exception as exc:
+            print(f"Langfuse chat-kb trace failed: {exc}")
 
     # ==================== AGENT CRUD ====================
 
@@ -393,34 +439,81 @@ class AgentService:
                 callbacks=langfuse_callbacks,
             )
 
-            return result
+            # Only use result if it has a response (agent succeeded)
+            if result and result.get("response"):
+                self._trace_chat_kb(
+                    query=query,
+                    response=result["response"],
+                    agent=agent,
+                    company_id=company_id,
+                    user_id=user_id,
+                    user_name=user_name,
+                    sources=result.get("sources", []),
+                    confidence=result.get("confidence", "medium"),
+                    processing_time_ms=result.get("processing_time_ms"),
+                    mode="langgraph",
+                )
+                return result
+
+            # If no response, log and continue to fallback
+            print(f"KB Agent returned empty result: {result}")
 
         except Exception as e:
-            # Fallback to simple RAG search if agent fails
-            search_results = await self.rag_service.search_similar(
-                company_id=company_id,
+            # Log error but continue to fallback
+            print(f"KB Agent failed with exception: {e}")
+
+        # Fallback to simple RAG search if agent fails or returns empty
+        search_results = await self.rag_service.search_similar(
+            company_id=company_id,
+            query=query,
+            top_k=5,
+        )
+
+        if not search_results:
+            response = "Não encontrei informações relevantes na base de conhecimento para sua pergunta."
+            self._trace_chat_kb(
                 query=query,
-                top_k=5,
+                response=response,
+                agent=agent,
+                company_id=company_id,
+                user_id=user_id,
+                user_name=user_name,
+                sources=[],
+                confidence="low",
+                processing_time_ms=None,
+                mode="fallback-no-sources",
             )
-
-            if not search_results:
-                return {
-                    "success": True,
-                    "response": "Não encontrei informações relevantes na base de conhecimento para sua pergunta.",
-                    "confidence": "low",
-                    "sources": [],
-                }
-
-            context = self._build_context(search_results)
-
             return {
                 "success": True,
-                "response": f"Baseando-me na base de conhecimento, aqui está o que encontrei para sua pergunta: '{query}'\n\n{context[:500]}...",
-                "confidence": "medium",
-                "sources": search_results if include_sources else [],
-                "agent_id": str(agent.id),
-                "agent_name": agent.name,
+                "response": response,
+                "confidence": "low",
+                "sources": [],
             }
+
+        context = self._build_context(search_results)
+        response = f"Baseando-me na base de conhecimento, aqui está o que encontrei para sua pergunta: '{query}'\n\n{context[:500]}..."
+
+        self._trace_chat_kb(
+            query=query,
+            response=response,
+            agent=agent,
+            company_id=company_id,
+            user_id=user_id,
+            user_name=user_name,
+            sources=search_results if include_sources else [],
+            confidence="medium",
+            processing_time_ms=None,
+            mode="fallback-rag",
+        )
+
+        return {
+            "success": True,
+            "response": response,
+            "confidence": "medium",
+            "sources": search_results if include_sources else [],
+            "agent_id": str(agent.id),
+            "agent_name": agent.name,
+        }
 
     def _build_context(self, search_results: List[dict]) -> str:
         """Build context string from search results"""

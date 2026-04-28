@@ -76,6 +76,7 @@ def create_kb_query_agent(
     # Initialize LLM with callbacks for Langfuse tracing
     llm = ChatOpenAI(
         api_key=api_key,
+        base_url="https://openrouter.ai/api/v1",
         model=model,
         temperature=temperature,
     )
@@ -116,16 +117,13 @@ async def search_knowledge_base(state: KBQueryState) -> KBQueryState:
     try:
         from app.services.rag_service import RAGService
         from app.database import AsyncSessionLocal
-        import uuid
-
         # Create DB session
         async with AsyncSessionLocal() as db:
             rag_service = RAGService(db)
 
             # Search knowledge base
-            company_uuid = uuid.UUID(state["company_id"]) if state["company_id"] else None
             results = await rag_service.search_similar(
-                company_id=company_uuid,
+                company_id=int(state["company_id"]),
                 query=state["query"],
                 top_k=5,
             )
@@ -191,8 +189,9 @@ async def generate_kb_response(state: KBQueryState) -> KBQueryState:
     start_time = datetime.now()
 
     try:
-        # Get system prompt
+        # Get system prompt and callbacks
         system_prompt = state.get("system_prompt", DEFAULT_KB_SYSTEM_PROMPT)
+        callbacks = state.get("callbacks", [])
 
         # Prepare prompt
         prompt = f"""{system_prompt}
@@ -215,8 +214,11 @@ Informe o nível de confiança na resposta.
 Responda em português brasileiro.
 """
 
-        # Generate response (callbacks already set in LLM via with_config)
-        response = await llm.ainvoke(prompt)
+        # Generate response with callbacks for tracing
+        response = await llm.ainvoke(
+            prompt,
+            config={"callbacks": callbacks} if callbacks else {}
+        )
         generated_text = (
             response.content if hasattr(response, "content") else str(response)
         )
@@ -375,6 +377,20 @@ async def process_kb_query(
             initial_state["temperature"],
             callbacks=callbacks,
         )
+
+        # Add tracing metadata
+        if callbacks:
+            for callback in callbacks:
+                if hasattr(callback, 'trace'):
+                    callback.trace.update(
+                        name="kb_query_agent",
+                        metadata={
+                            "company_id": company_id,
+                            "user_id": user_id,
+                            "query": query,
+                            "model": initial_state["llm_model"],
+                        }
+                    )
 
         result = await agent.ainvoke(
             initial_state,
