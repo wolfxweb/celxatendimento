@@ -50,6 +50,13 @@ export default function AprovacaoPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [processing, setProcessing] = useState<string | null>(null)
   const [feedbackMode, setFeedbackMode] = useState<string | null>(null)
+  const [feedbackModal, setFeedbackModal] = useState<{
+    ticketId: string
+    rating: number
+    isExampleGood: boolean
+    isExampleBad: boolean
+  } | null>(null)
+  const [feedbackText, setFeedbackText] = useState('')
 
   useEffect(() => {
     loadData()
@@ -122,18 +129,25 @@ export default function AprovacaoPage() {
     }
   }
 
-  async function handleRate(ticketId: string, rating: number, isExampleGood: boolean, isExampleBad: boolean) {
-    const feedback = prompt('Feedback sobre a resposta da IA (opcional):')
-    
-    setProcessing(ticketId)
+  function openFeedbackModal(ticketId: string, rating: number, isExampleGood: boolean, isExampleBad: boolean) {
+    setFeedbackText('')
+    setFeedbackModal({ ticketId, rating, isExampleGood, isExampleBad })
+  }
+
+  async function handleRate() {
+    if (!feedbackModal) return
+
+    setProcessing(feedbackModal.ticketId)
     try {
-      await apiPost(`/tickets/${ticketId}/ai/feedback`, {
-        rating,
-        feedback,
-        is_example_good: isExampleGood,
-        is_example_bad: isExampleBad,
+      await apiPost(`/tickets/${feedbackModal.ticketId}/ai/feedback`, {
+        rating: feedbackModal.rating,
+        feedback: feedbackText.trim() || null,
+        is_example_good: feedbackModal.isExampleGood,
+        is_example_bad: feedbackModal.isExampleBad,
       })
       setFeedbackMode(null)
+      setFeedbackModal(null)
+      setFeedbackText('')
       loadData()
     } catch (err) {
       alert('Erro ao enviar feedback')
@@ -436,7 +450,7 @@ export default function AprovacaoPage() {
                               <button
                                 onClick={() => {
                                   const rating = parseInt(feedbackMode.split('-')[1])
-                                  handleRate(ticket.id, rating, false, false)
+                                  openFeedbackModal(ticket.id, rating, false, false)
                                 }}
                                 disabled={processing === ticket.id}
                                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 text-white font-medium shadow-lg hover:shadow-glow-primary transition-all disabled:opacity-50"
@@ -484,8 +498,58 @@ export default function AprovacaoPage() {
                   </div>
                 )}
               </div>
-            )
-          })}
+              )
+            })}
+          </div>
+        )}
+
+      {feedbackModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white shadow-card-hover border border-slate-100 overflow-hidden">
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-start gap-4">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600">
+                  <span className="text-xl">★</span>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Avaliar resposta da IA</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Feedback sobre a resposta da IA (opcional):
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <textarea
+                value={feedbackText}
+                onChange={(e) => setFeedbackText(e.target.value)}
+                rows={5}
+                className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all resize-none"
+                placeholder="Digite seu feedback..."
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-4 bg-slate-50">
+              <button
+                onClick={() => {
+                  setFeedbackModal(null)
+                  setFeedbackText('')
+                }}
+                disabled={processing === feedbackModal.ticketId}
+                className="px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 bg-white hover:bg-slate-50 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleRate}
+                disabled={processing === feedbackModal.ticketId}
+                className="px-4 py-2 rounded-lg bg-gradient-primary text-white text-sm font-semibold shadow-lg hover:shadow-glow-primary disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {processing === feedbackModal.ticketId ? 'Enviando...' : 'Enviar avaliação'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -163,7 +163,6 @@ export default function NovoTicketPage() {
         }
       }
 
-      alert(`Ticket ${result.ticket_number} criado com sucesso!`)
       router.push('/dashboard/cliente/tickets')
     } catch (err) {
       setError('Erro ao criar ticket. Tente novamente.')
