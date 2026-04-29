@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 from typing import Optional, List, Dict, Any
 
+import httpx
 from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -106,6 +107,101 @@ class AgentService:
             langfuse.flush()
         except Exception as exc:
             print(f"Langfuse chat-kb trace failed: {exc}")
+
+    def _is_useful_kb_source(self, source: dict) -> bool:
+        content = (source.get("content") or "").strip()
+        if not content:
+            return False
+
+        useless_messages = [
+            "Não foi possível extrair texto automaticamente deste arquivo.",
+        ]
+        if any(message in content for message in useless_messages):
+            return False
+
+        score = source.get("score")
+        if isinstance(score, (int, float)) and 0 <= score <= 1:
+            return score >= 0.3
+
+        return True
+
+    def _build_kb_prompt(
+        self,
+        *,
+        query: str,
+        sources: List[dict],
+        system_prompt: Optional[str],
+        user_name: Optional[str],
+    ) -> str:
+        context_blocks = []
+        for index, source in enumerate(sources, start=1):
+            context_blocks.append(
+                f"[{index}] {source.get('title', 'Fonte sem título')}\n"
+                f"{source.get('content', '').strip()}"
+            )
+
+        instructions = system_prompt or DEFAULT_KB_AGENT_PROMPT
+        return f"""
+{instructions}
+
+Usuário: {user_name or "Atendente"}
+Pergunta:
+{query}
+
+Fontes recuperadas por busca semântica/embedding:
+{chr(10).join(context_blocks)}
+
+Instruções para a resposta:
+- Responda em português brasileiro.
+- Use apenas as fontes acima como base factual.
+- Não copie a lista de fontes literalmente.
+- Não mencione scores, embeddings ou detalhes técnicos internos.
+- Se as fontes não responderem à pergunta, diga isso de forma objetiva.
+- Quando usar uma fonte, cite o título entre colchetes, por exemplo: [Sem internet].
+""".strip()
+
+    async def _generate_kb_ai_response(
+        self,
+        *,
+        api_key: str,
+        model: str,
+        temperature: float,
+        prompt: str,
+    ) -> tuple[str, int]:
+        start = datetime.now()
+
+        async with httpx.AsyncClient(timeout=90) as client:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "temperature": temperature,
+                },
+            )
+
+        if response.status_code >= 400:
+            try:
+                detail = response.json()
+            except ValueError:
+                detail = response.text
+            raise ValueError(f"OpenRouter retornou {response.status_code}: {detail}")
+
+        payload = response.json()
+        content = (
+            payload.get("choices", [{}])[0]
+            .get("message", {})
+            .get("content")
+        )
+        if not content:
+            raise ValueError("OpenRouter não retornou conteúdo para a resposta")
+
+        processing_time_ms = int((datetime.now() - start).total_seconds() * 1000)
+        return content.strip(), processing_time_ms
 
     # ==================== AGENT CRUD ====================
 
@@ -469,7 +565,11 @@ class AgentService:
             top_k=5,
         )
 
-        if not search_results:
+        useful_results = [
+            source for source in search_results if self._is_useful_kb_source(source)
+        ]
+
+        if not useful_results:
             response = "Não encontrei informações relevantes na base de conhecimento para sua pergunta."
             self._trace_chat_kb(
                 query=query,
@@ -490,8 +590,28 @@ class AgentService:
                 "sources": [],
             }
 
-        context = self._build_context(search_results)
-        response = f"Baseando-me na base de conhecimento, aqui está o que encontrei para sua pergunta: '{query}'\n\n{context[:500]}..."
+        prompt = self._build_kb_prompt(
+            query=query,
+            sources=useful_results,
+            system_prompt=system_prompt,
+            user_name=user_name,
+        )
+
+        try:
+            response, processing_time_ms = await self._generate_kb_ai_response(
+                api_key=api_key,
+                model=agent.llm_model,
+                temperature=agent.temperature,
+                prompt=prompt,
+            )
+        except Exception as exc:
+            print(f"KB fallback LLM failed with exception: {exc}")
+            context = self._build_context(useful_results)
+            response = (
+                "Encontrei informações relacionadas na base de conhecimento, "
+                f"mas não consegui gerar uma resposta automática agora.\n\n{context[:500]}..."
+            )
+            processing_time_ms = None
 
         self._trace_chat_kb(
             query=query,
@@ -500,17 +620,17 @@ class AgentService:
             company_id=company_id,
             user_id=user_id,
             user_name=user_name,
-            sources=search_results if include_sources else [],
+            sources=useful_results if include_sources else [],
             confidence="medium",
-            processing_time_ms=None,
-            mode="fallback-rag",
+            processing_time_ms=processing_time_ms,
+            mode="fallback-rag-llm",
         )
 
         return {
             "success": True,
             "response": response,
             "confidence": "medium",
-            "sources": search_results if include_sources else [],
+            "sources": useful_results if include_sources else [],
             "agent_id": str(agent.id),
             "agent_name": agent.name,
         }

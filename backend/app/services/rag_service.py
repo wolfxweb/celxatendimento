@@ -3,6 +3,7 @@ RAG Service for Knowledge Base management and search
 """
 
 import json
+import re
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -159,6 +160,7 @@ class RAGService:
         articles_with_embeddings = [
             a for a in articles if a.embedding and a.is_indexed
         ]
+        semantic_results = []
 
         if articles_with_embeddings and articles_with_embeddings[0].embedding:
             # Get embedding model from company config
@@ -211,40 +213,42 @@ class RAGService:
                             # Sort by similarity
                             results_with_scores.sort(key=lambda x: x["score"], reverse=True)
 
-                            # Return top_k results
-                            results = []
+                            # Return top_k semantic results
                             for item in results_with_scores[:top_k]:
                                 article = item["article"]
-                                results.append({
-                                    "id": article.id,
-                                    "title": article.title,
-                                    "content": article.content[:500] + "..."
-                                    if len(article.content) > 500
-                                    else article.content,
-                                    "score": round(item["score"], 3),
-                                    "source_type": article.source_type,
-                                })
-
-                            if results:
-                                return results
+                                semantic_results.append(
+                                    self._format_search_result(
+                                        article=article,
+                                        query=query,
+                                        score=round(item["score"], 3),
+                                    )
+                                )
                 except Exception:
                     # Fall back to keyword search on error
                     pass
 
         # Fallback: Simple keyword matching
-        results = []
+        keyword_results = []
+        indexed_article_ids = {article.id for article in articles_with_embeddings}
         query_lower = query.lower()
 
         for article in articles:
+            if semantic_results and article.id in indexed_article_ids:
+                continue
+
             # Simple scoring based on keyword matching
             score = 0
             title_words = article.title.lower().split()
+            filename = (article.original_filename or "").lower()
+            filename_words = filename.replace("_", " ").replace("-", " ").split()
             content_words = article.content.lower().split()
             query_words = query_lower.split()
 
             # Title match (higher weight)
             for word in query_words:
                 if word in title_words:
+                    score += 2
+                if word in filename_words:
                     score += 2
 
             # Content match
@@ -255,23 +259,85 @@ class RAGService:
             # Partial match bonus
             if any(word in article.title.lower() for word in query_words):
                 score += 0.5
+            if any(word in filename for word in query_words):
+                score += 0.5
 
             if score > 0:
-                results.append(
-                    {
-                        "id": article.id,
-                        "title": article.title,
-                        "content": article.content[:500] + "..."
-                        if len(article.content) > 500
-                        else article.content,
-                        "score": score,
-                        "source_type": article.source_type,
-                    }
+                keyword_results.append(
+                    self._format_search_result(
+                        article=article,
+                        query=query,
+                        score=score,
+                    )
                 )
 
-        # Sort by score and return top_k
+        if semantic_results:
+            return (semantic_results + keyword_results)[:top_k]
+
+        merged_results = {}
+        for result in semantic_results + keyword_results:
+            current = merged_results.get(result["id"])
+            if not current or result["score"] > current["score"]:
+                merged_results[result["id"]] = result
+
+        results = list(merged_results.values())
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:top_k]
+
+    def _format_search_result(
+        self,
+        *,
+        article: KnowledgeBase,
+        query: str,
+        score: float,
+    ) -> dict:
+        return {
+            "id": article.id,
+            "title": article.title,
+            "content": self._extract_relevant_snippet(article.content or "", query),
+            "score": score,
+            "source_type": article.source_type,
+            "original_filename": article.original_filename,
+        }
+
+    def _extract_relevant_snippet(
+        self,
+        content: str,
+        query: str,
+        max_length: int = 1800,
+    ) -> str:
+        content = content.strip()
+        if len(content) <= max_length:
+            return content
+
+        query_terms = [
+            re.escape(term.lower())
+            for term in query.split()
+            if len(term.strip()) >= 3
+        ]
+        if not query_terms:
+            return content[:max_length].strip() + "..."
+
+        lower_content = content.lower()
+        match_positions = [
+            match.start()
+            for term in query_terms
+            for match in re.finditer(term, lower_content)
+        ]
+
+        if not match_positions:
+            return content[:max_length].strip() + "..."
+
+        center = min(match_positions)
+        start = max(0, center - max_length // 3)
+        end = min(len(content), start + max_length)
+
+        snippet = content[start:end].strip()
+        if start > 0:
+            snippet = "..." + snippet
+        if end < len(content):
+            snippet = snippet + "..."
+        return snippet
 
     def _cosine_similarity(self, vec1: list, vec2: list) -> float:
         """Calculate cosine similarity between two vectors"""
@@ -343,6 +409,7 @@ class RAGService:
 
         api_key = decrypt_api_key(ai_config.api_key_encrypted)
         model = ai_config.embedding_model or "text-embedding-3-small"
+        embedding_input = article.content[:24000]
 
         try:
             async with httpx.AsyncClient(timeout=60) as client:
@@ -354,7 +421,7 @@ class RAGService:
                     },
                     json={
                         "model": model,
-                        "input": article.content,
+                        "input": embedding_input,
                     },
                 )
 
