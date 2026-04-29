@@ -19,8 +19,11 @@ from app.models.agent_config import AgentConfig, AgentType, AutonomyLevel
 from app.models.agent_prompt import AgentPrompt, PromptType
 from app.models.company_ai_config import CompanyAIConfig
 from app.ai.callbacks import (
+    compile_langfuse_prompt,
+    confidence_to_score,
     get_langfuse_client,
     get_langfuse_model_usage,
+    get_langfuse_prompt,
     get_openai_usage_details,
 )
 from app.services.rag_service import RAGService
@@ -60,6 +63,27 @@ Você ajuda atendentes e administradores a encontrar informações na base de co
 - Informe a confiança na resposta (alta/baixa)"""
 
 
+CHAT_KB_RESPONSE_PROMPT = """
+Você é um assistente de consulta à base de conhecimento da empresa.
+
+Usuário: {{user_name}}
+Pergunta:
+{{query}}
+
+Fontes recuperadas por busca semântica/embedding:
+{{knowledge_context}}
+
+Instruções:
+- Responda em português brasileiro.
+- Use apenas as fontes acima como base factual.
+- Não copie a lista de fontes literalmente.
+- Não mencione scores, embeddings ou detalhes técnicos internos.
+- Se as fontes não responderem à pergunta, diga isso de forma objetiva.
+- Quando usar uma fonte, cite o título entre colchetes, por exemplo: [Sem internet].
+- Informe a confiança no final como alta, média ou baixa.
+""".strip()
+
+
 class AgentService:
     """Service for managing agents and their prompts"""
 
@@ -83,13 +107,29 @@ class AgentService:
         usage_details: Optional[dict] = None,
         model_usage: Optional[dict] = None,
         raw_usage: Optional[dict] = None,
+        generation_input: Optional[str] = None,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        langfuse_prompt=None,
+        generation_start_time: Optional[datetime] = None,
+        generation_end_time: Optional[datetime] = None,
     ) -> None:
         langfuse = get_langfuse_client()
         if not langfuse:
             return
 
         try:
+            trace_id = str(uuid.uuid4())
+            max_retrieval_score = max(
+                [
+                    float(source.get("score"))
+                    for source in sources
+                    if isinstance(source.get("score"), (int, float))
+                ],
+                default=0.0,
+            )
             trace = langfuse.trace(
+                id=trace_id,
                 name="chat-kb",
                 user_id=user_id or "unknown",
                 input=query,
@@ -103,18 +143,43 @@ class AgentService:
                     "processing_time_ms": processing_time_ms,
                     "mode": mode,
                     "sources_count": len(sources),
+                    "retrieval_score": max_retrieval_score,
                 },
             )
             trace.generation(
+                id=str(uuid.uuid4()),
                 name="chat-kb-response",
-                model=agent.llm_model,
-                input=query,
+                start_time=generation_start_time,
+                end_time=generation_end_time,
+                model=model or agent.llm_model,
+                input=generation_input or query,
                 output=response,
-                model_parameters={"temperature": agent.temperature},
+                model_parameters={"temperature": temperature if temperature is not None else agent.temperature},
                 usage=model_usage or None,
                 usage_details=usage_details or None,
                 metadata={"sources": sources, "usage": raw_usage},
+                prompt=langfuse_prompt,
             )
+            langfuse.score(
+                trace_id=trace_id,
+                name="confidence",
+                value=confidence_to_score(confidence),
+                data_type="NUMERIC",
+                comment=confidence,
+            )
+            langfuse.score(
+                trace_id=trace_id,
+                name="retrieval_score",
+                value=float(max_retrieval_score),
+                data_type="NUMERIC",
+            )
+            if processing_time_ms is not None:
+                langfuse.score(
+                    trace_id=trace_id,
+                    name="latency_ms",
+                    value=float(processing_time_ms),
+                    data_type="NUMERIC",
+                )
             langfuse.flush()
         except Exception as exc:
             print(f"Langfuse chat-kb trace failed: {exc}")
@@ -136,13 +201,10 @@ class AgentService:
 
         return True
 
-    def _build_kb_prompt(
+    def _build_kb_context(
         self,
         *,
-        query: str,
         sources: List[dict],
-        system_prompt: Optional[str],
-        user_name: Optional[str],
     ) -> str:
         context_blocks = []
         for index, source in enumerate(sources, start=1):
@@ -150,26 +212,7 @@ class AgentService:
                 f"[{index}] {source.get('title', 'Fonte sem título')}\n"
                 f"{source.get('content', '').strip()}"
             )
-
-        instructions = system_prompt or DEFAULT_KB_AGENT_PROMPT
-        return f"""
-{instructions}
-
-Usuário: {user_name or "Atendente"}
-Pergunta:
-{query}
-
-Fontes recuperadas por busca semântica/embedding:
-{chr(10).join(context_blocks)}
-
-Instruções para a resposta:
-- Responda em português brasileiro.
-- Use apenas as fontes acima como base factual.
-- Não copie a lista de fontes literalmente.
-- Não mencione scores, embeddings ou detalhes técnicos internos.
-- Se as fontes não responderem à pergunta, diga isso de forma objetiva.
-- Quando usar uma fonte, cite o título entre colchetes, por exemplo: [Sem internet].
-""".strip()
+        return "\n\n".join(context_blocks)
 
     async def _generate_kb_ai_response(
         self,
@@ -178,7 +221,7 @@ Instruções para a resposta:
         model: str,
         temperature: float,
         prompt: str,
-    ) -> tuple[str, int, dict, dict, dict]:
+    ) -> tuple[str, int, dict, dict, dict, datetime, datetime]:
         start = datetime.now()
 
         async with httpx.AsyncClient(timeout=90) as client:
@@ -211,7 +254,8 @@ Instruções para a resposta:
         if not content:
             raise ValueError("OpenRouter não retornou conteúdo para a resposta")
 
-        processing_time_ms = int((datetime.now() - start).total_seconds() * 1000)
+        end = datetime.now()
+        processing_time_ms = int((end - start).total_seconds() * 1000)
         usage_details = get_openai_usage_details(payload)
         model_usage = get_langfuse_model_usage(payload)
         return (
@@ -220,6 +264,8 @@ Instruções para a resposta:
             usage_details,
             model_usage,
             payload.get("usage") or {},
+            start,
+            end,
         )
 
     # ==================== AGENT CRUD ====================
@@ -609,15 +655,28 @@ Instruções para a resposta:
                 "sources": [],
             }
 
-        prompt = self._build_kb_prompt(
-            query=query,
+        knowledge_context = self._build_kb_context(
             sources=useful_results,
-            system_prompt=system_prompt,
-            user_name=user_name,
         )
+        langfuse_prompt = get_langfuse_prompt(
+            "chat-kb-response",
+            fallback=CHAT_KB_RESPONSE_PROMPT,
+        )
+        prompt = compile_langfuse_prompt(
+            langfuse_prompt,
+            CHAT_KB_RESPONSE_PROMPT,
+            user_name=user_name or "Atendente",
+            query=query,
+            knowledge_context=knowledge_context,
+        )
+        prompt_config = getattr(langfuse_prompt, "config", None) or {}
+        llm_model = prompt_config.get("model", agent.llm_model)
+        temperature = prompt_config.get("temperature", agent.temperature)
         usage_details = {}
         model_usage = {}
         raw_usage = {}
+        generation_start_time = None
+        generation_end_time = None
 
         try:
             (
@@ -626,10 +685,12 @@ Instruções para a resposta:
                 usage_details,
                 model_usage,
                 raw_usage,
+                generation_start_time,
+                generation_end_time,
             ) = await self._generate_kb_ai_response(
                 api_key=api_key,
-                model=agent.llm_model,
-                temperature=agent.temperature,
+                model=llm_model,
+                temperature=temperature,
                 prompt=prompt,
             )
         except Exception as exc:
@@ -655,6 +716,12 @@ Instruções para a resposta:
             usage_details=usage_details,
             model_usage=model_usage,
             raw_usage=raw_usage,
+            generation_input=prompt,
+            model=llm_model,
+            temperature=temperature,
+            langfuse_prompt=langfuse_prompt,
+            generation_start_time=generation_start_time,
+            generation_end_time=generation_end_time,
         )
 
         return {

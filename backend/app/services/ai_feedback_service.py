@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.ticket_ai_response import TicketAIResponse
 from app.models.ai_feedback_log import AIFeedbackLog
+from app.ai.callbacks import create_langfuse_score
 
 
 class AIFeedbackService:
@@ -105,6 +106,32 @@ class AIFeedbackService:
 
         self.db.add(feedback_log)
         await self.db.commit()
+
+        config_snapshot = {}
+        if isinstance(ai_response.config_snapshot, str):
+            try:
+                config_snapshot = json.loads(ai_response.config_snapshot)
+            except json.JSONDecodeError:
+                config_snapshot = {}
+        elif isinstance(ai_response.config_snapshot, dict):
+            config_snapshot = ai_response.config_snapshot
+
+        trace_id = config_snapshot.get("langfuse_trace_id")
+        if trace_id:
+            create_langfuse_score(
+                trace_id=trace_id,
+                name="agent_rating",
+                value=float(rating) / 5,
+                data_type="NUMERIC",
+                comment=feedback_text,
+            )
+            create_langfuse_score(
+                trace_id=trace_id,
+                name="agent_feedback_category",
+                value="good" if rating >= 4 else "neutral" if rating == 3 else "bad",
+                data_type="CATEGORICAL",
+                comment=feedback_text,
+            )
 
         return {
             "status": "success",

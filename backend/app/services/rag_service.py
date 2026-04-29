@@ -36,22 +36,33 @@ class RAGService:
         input_text: str,
         metadata: dict,
         payload: dict,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> None:
         langfuse = get_langfuse_client()
         if not langfuse:
             return
 
+        latency_ms = None
+        if start_time and end_time:
+            latency_ms = int((end_time - start_time).total_seconds() * 1000)
+
         usage_details = get_openai_usage_details(payload)
         model_usage = get_langfuse_model_usage(payload)
         try:
+            trace_id = str(uuid.uuid4())
             trace = langfuse.trace(
+                id=trace_id,
                 name=name,
                 input=input_text,
-                metadata=metadata,
+                metadata={**metadata, "latency_ms": latency_ms},
                 tags=["rag", "embedding", "openrouter"],
             )
             trace.generation(
+                id=str(uuid.uuid4()),
                 name="openrouter-embedding",
+                start_time=start_time,
+                end_time=end_time,
                 model=model,
                 input=input_text,
                 output={"embedding_dimensions": len(payload.get("data", [{}])[0].get("embedding") or [])},
@@ -59,6 +70,19 @@ class RAGService:
                 usage_details=usage_details or None,
                 metadata={"usage": payload.get("usage"), **metadata},
             )
+            langfuse.score(
+                trace_id=trace_id,
+                name="embedding_generated",
+                value=1,
+                data_type="BOOLEAN",
+            )
+            if latency_ms is not None:
+                langfuse.score(
+                    trace_id=trace_id,
+                    name="latency_ms",
+                    value=float(latency_ms),
+                    data_type="NUMERIC",
+                )
             langfuse.flush()
         except Exception as exc:
             print(f"Langfuse embedding trace failed: {exc}")
@@ -217,6 +241,7 @@ class RAGService:
 
                 # Generate query embedding
                 try:
+                    embedding_start = datetime.now()
                     async with httpx.AsyncClient(timeout=60) as client:
                         response = await client.post(
                             "https://openrouter.ai/api/v1/embeddings",
@@ -229,6 +254,7 @@ class RAGService:
                                 "input": query,
                             },
                         )
+                    embedding_end = datetime.now()
 
                     if response.status_code == 200:
                         payload = response.json()
@@ -244,6 +270,8 @@ class RAGService:
                                 "top_k": top_k,
                             },
                             payload=payload,
+                            start_time=embedding_start,
+                            end_time=embedding_end,
                         )
                         query_embedding = payload.get("data", [{}])[0].get("embedding")
 
@@ -465,6 +493,7 @@ class RAGService:
         embedding_input = article.content[:24000]
 
         try:
+            embedding_start = datetime.now()
             async with httpx.AsyncClient(timeout=60) as client:
                 response = await client.post(
                     "https://openrouter.ai/api/v1/embeddings",
@@ -477,6 +506,7 @@ class RAGService:
                         "input": embedding_input,
                     },
                 )
+            embedding_end = datetime.now()
 
             if response.status_code >= 400:
                 try:
@@ -499,6 +529,8 @@ class RAGService:
                     "embedding_input_chars": len(embedding_input),
                 },
                 payload=payload,
+                start_time=embedding_start,
+                end_time=embedding_end,
             )
             embedding = payload.get("data", [{}])[0].get("embedding")
             if not embedding:

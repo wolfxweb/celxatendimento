@@ -171,7 +171,6 @@ export default function AdminConfigIAPage() {
           embedding_model: embeddingModel,
           temperature: temperature,
           max_tokens: maxTokens,
-          system_prompt: systemPrompt,
           autonomy_level: autonomyLevel,
           tools: selectedTools,
         });
@@ -184,7 +183,6 @@ export default function AdminConfigIAPage() {
           embedding_model: embeddingModel || 'text-embedding-3-small',
           temperature,
           max_tokens: maxTokens,
-          system_prompt: systemPrompt,
           tools: selectedTools,
           autonomy_level: autonomyLevel,
         });
@@ -671,31 +669,36 @@ export default function AdminConfigIAPage() {
               📝
             </div>
             <div>
-              <h2 className="text-xl font-bold text-slate-800">Prompt do Sistema</h2>
-              <p className="text-sm text-slate-500">Instruções para o agente de IA</p>
+              <h2 className="text-xl font-bold text-slate-800">Prompts no Langfuse</h2>
+              <p className="text-sm text-slate-500">Criação, edição e versionamento são feitos no Langfuse</p>
             </div>
           </div>
 
-          <textarea
-            value={systemPrompt}
-            onChange={(e) => setSystemPrompt(e.target.value)}
-            rows={10}
-            placeholder="Digite o prompt do sistema..."
-            className="w-full px-4 py-3 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all resize-none font-mono text-sm"
-          />
-
-          <div className="mt-3 flex items-center justify-between">
-            <p className="text-xs text-slate-400">
-              Variables disponíveis: &#123;company_name&#125;, &#123;query&#125;, &#123;rag_context&#125;, &#123;customer_name&#125;
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
+            <p className="text-sm text-slate-700">
+              Use os prompts <strong>ticket-ai-response</strong> e <strong>chat-kb-response</strong> no Langfuse com a label <strong>production</strong>.
+              O modelo, temperatura e demais parâmetros devem ficar no campo <strong>Config</strong> do prompt.
             </p>
-            {currentAgentId && (
-              <a
-                href={`/dashboard/admin/config-ia/prompt-editor?agent=${currentAgentId}`}
-                className="text-sm text-primary-600 hover:text-primary-700 hover:underline"
-              >
-                Editar com editor visual →
-              </a>
-            )}
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-white/80 bg-white p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Agente de atendimento</p>
+                <p className="mt-1 font-mono text-sm text-slate-800">ticket-ai-response</p>
+              </div>
+              <div className="rounded-lg border border-white/80 bg-white p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Chat base de conhecimento</p>
+                <p className="mt-1 font-mono text-sm text-slate-800">chat-kb-response</p>
+              </div>
+            </div>
+
+            <a
+              href="http://localhost:3001"
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+            >
+              Abrir Langfuse
+            </a>
           </div>
         </div>
 

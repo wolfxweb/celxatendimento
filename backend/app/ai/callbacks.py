@@ -108,3 +108,102 @@ def get_langfuse_model_usage(payload: dict) -> dict:
         model_usage["total_cost"] = float(total_cost)
 
     return model_usage
+
+
+def get_langfuse_prompt(
+    name: str,
+    *,
+    fallback: str,
+    label: str = "production",
+    cache_ttl_seconds: int = 60,
+):
+    """
+    Fetch a production prompt from Langfuse Prompt Management.
+
+    The SDK caches prompts client-side. On any Langfuse/network issue, callers can
+    still use the provided fallback text.
+    """
+    langfuse = get_langfuse_client()
+    if not langfuse:
+        return None
+
+    try:
+        return langfuse.get_prompt(
+            name,
+            label=label,
+            type="text",
+            fallback=fallback,
+            cache_ttl_seconds=cache_ttl_seconds,
+        )
+    except Exception as exc:
+        print(f"Langfuse prompt fetch failed for {name}: {exc}")
+        return None
+
+
+def compile_langfuse_prompt(prompt_client, fallback: str, **variables) -> str:
+    def compile_template(template: str) -> str:
+        result = template or fallback
+        for key, value in variables.items():
+            result = result.replace(
+                f"{{{{{key}}}}}",
+                "" if value is None else str(value),
+            )
+        return result
+
+    if not prompt_client:
+        return compile_template(fallback)
+
+    try:
+        compiled = prompt_client.compile(**variables)
+        if isinstance(compiled, str) and compiled.strip():
+            return compiled
+        return compile_template(getattr(prompt_client, "prompt", None) or fallback)
+    except Exception as exc:
+        print(f"Langfuse prompt compile failed: {exc}")
+        return compile_template(getattr(prompt_client, "prompt", None) or fallback)
+
+
+def confidence_to_score(confidence: str) -> float:
+    return {
+        "high": 0.9,
+        "alta": 0.9,
+        "medium": 0.6,
+        "media": 0.6,
+        "média": 0.6,
+        "low": 0.3,
+        "baixa": 0.3,
+    }.get((confidence or "").lower(), 0.5)
+
+
+def create_langfuse_score(
+    *,
+    trace_id: str,
+    name: str,
+    value,
+    data_type: str = "NUMERIC",
+    comment: str | None = None,
+) -> None:
+    langfuse = get_langfuse_client()
+    if not langfuse:
+        return
+
+    try:
+        langfuse.score(
+            trace_id=trace_id,
+            name=name,
+            value=value,
+            data_type=data_type,
+            comment=comment,
+        )
+        langfuse.flush()
+    except Exception as exc:
+        print(f"Langfuse score failed for {name}: {exc}")
+
+    try:
+        return prompt_client.compile(**variables)
+    except Exception as exc:
+        print(f"Langfuse prompt compile failed: {exc}")
+        result = fallback
+        for key, value in variables.items():
+            result = result.replace(f"{{{{{key}}}}}", str(value))
+        return result

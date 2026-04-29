@@ -5,6 +5,7 @@ AI response generation for tickets.
 import io
 import json
 import os
+import uuid
 from datetime import datetime
 
 import httpx
@@ -20,8 +21,11 @@ from app.models.ticket_ai_response import TicketAIResponse
 from app.models.user import User
 from app.services.rag_service import RAGService
 from app.ai.callbacks import (
+    compile_langfuse_prompt,
+    create_langfuse_score,
     get_langfuse_callbacks,
     get_langfuse_client,
+    get_langfuse_prompt,
     get_langfuse_model_usage,
     get_openai_usage_details,
 )
@@ -31,6 +35,32 @@ LEGACY_LLM_MODEL_REPLACEMENTS = {
     "google/gemini-1.5-flash-8b": "google/gemini-2.5-flash-lite",
     "google/gemini-2.0-flash-exp": "google/gemini-2.5-flash-lite",
 }
+
+TICKET_AI_RESPONSE_PROMPT = """
+Você é um agente de atendimento. Gere uma resposta para o cliente, mas ela será revisada por um atendente antes do envio.
+
+Cliente: {{customer_name}}
+Email: {{customer_email}}
+Assunto do chamado: {{ticket_subject}}
+Descrição do chamado:
+{{ticket_description}}
+
+Prioridade: {{ticket_priority}}
+
+Base de conhecimento:
+{{knowledge_context}}
+
+Anexos do chamado:
+{{attachments_context}}
+
+Instruções:
+- Responda em português brasileiro.
+- Seja profissional, claro e útil.
+- Use a base de conhecimento e os anexos quando trouxerem informações aplicáveis.
+- Se houver conflito entre a descrição e os anexos, mencione que precisa de confirmação.
+- Não diga que a resposta já foi enviada ou aprovada.
+- Se faltarem informações, peça objetivamente o que é necessário.
+""".strip()
 
 
 def _json_text(data: dict) -> str:
@@ -117,13 +147,10 @@ async def _load_ticket_attachment_context(
     return extracted
 
 
-def _build_prompt(
-    ticket: Ticket,
-    customer: User | None,
-    system_prompt: str,
+def _build_ticket_contexts(
     rag_sources: list[dict],
     attachment_context: list[dict],
-) -> str:
+) -> tuple[str, str]:
     context = "Nenhuma informação relevante encontrada na base de conhecimento."
     if rag_sources:
         context = "\n\n".join(
@@ -131,8 +158,6 @@ def _build_prompt(
             for index, source in enumerate(rag_sources, start=1)
         )
 
-    customer_name = customer.full_name if customer else "Cliente"
-    customer_email = customer.email if customer else ""
     attachments = "Nenhum anexo de texto/PDF com conteúdo extraído."
     if attachment_context:
         attachments = "\n\n".join(
@@ -143,33 +168,7 @@ def _build_prompt(
             for attachment in attachment_context
         )
 
-    return f"""
-{system_prompt}
-
-Você é um agente de atendimento. Gere uma resposta para o cliente, mas ela será revisada por um atendente antes do envio.
-
-Cliente: {customer_name}
-Email: {customer_email}
-Assunto do chamado: {ticket.subject}
-Descrição do chamado:
-{ticket.description}
-
-Prioridade: {ticket.priority}
-
-Base de conhecimento:
-{context}
-
-Anexos do chamado:
-{attachments}
-
-Instruções:
-- Responda em português brasileiro.
-- Seja profissional, claro e útil.
-- Use a base de conhecimento e os anexos quando trouxerem informações aplicáveis.
-- Se houver conflito entre a descrição e os anexos, mencione que precisa de confirmação.
-- Não diga que a resposta já foi enviada ou aprovada.
-- Se faltarem informações, peça objetivamente o que é necessário.
-""".strip()
+    return context, attachments
 
 
 async def _call_openrouter_chat(
@@ -179,7 +178,9 @@ async def _call_openrouter_chat(
     prompt: str,
     callbacks: list = None,
     trace_metadata: dict | None = None,
-) -> tuple[str, int]:
+    langfuse_prompt=None,
+    trace_id: str | None = None,
+) -> tuple[str, int, str | None]:
     start = datetime.now()
 
     async with httpx.AsyncClient(timeout=90) as client:
@@ -212,21 +213,30 @@ async def _call_openrouter_chat(
     if not content:
         raise ValueError("OpenRouter não retornou conteúdo para a resposta")
 
-    processing_time_ms = int((datetime.now() - start).total_seconds() * 1000)
+    end = datetime.now()
+    processing_time_ms = int((end - start).total_seconds() * 1000)
     usage_details = get_openai_usage_details(payload)
     model_usage = get_langfuse_model_usage(payload)
     langfuse = get_langfuse_client()
+    resolved_trace_id = trace_id or str(uuid.uuid4())
     if langfuse:
         try:
             trace = langfuse.trace(
+                id=resolved_trace_id,
                 name="ticket-ai-response",
                 input=prompt,
                 output=content,
-                metadata=trace_metadata or {},
+                metadata={
+                    **(trace_metadata or {}),
+                    "latency_ms": processing_time_ms,
+                },
                 tags=["ticket", "ai-response", "openrouter"],
             )
             trace.generation(
+                id=str(uuid.uuid4()),
                 name="openrouter-chat-completion",
+                start_time=start,
+                end_time=end,
                 model=model,
                 input=prompt,
                 output=content,
@@ -234,12 +244,25 @@ async def _call_openrouter_chat(
                 usage=model_usage or None,
                 usage_details=usage_details or None,
                 metadata={"usage": payload.get("usage")},
+                prompt=langfuse_prompt,
+            )
+            langfuse.score(
+                trace_id=resolved_trace_id,
+                name="latency_ms",
+                value=float(processing_time_ms),
+                data_type="NUMERIC",
+            )
+            langfuse.score(
+                trace_id=resolved_trace_id,
+                name="ai_response_generated",
+                value=1,
+                data_type="BOOLEAN",
             )
             langfuse.flush()
         except Exception:
             pass
 
-    return content.strip(), processing_time_ms
+    return content.strip(), processing_time_ms, resolved_trace_id
 
 
 async def generate_pending_ai_response(
@@ -302,28 +325,48 @@ async def generate_pending_ai_response(
     attachment_context = await _load_ticket_attachment_context(db, ticket.id)
 
     api_key = decrypt_api_key(ai_config.api_key_encrypted)
-    prompt = _build_prompt(
-        ticket=ticket,
-        customer=customer,
-        system_prompt=ai_config.system_prompt,
+    knowledge_context, attachments_context = _build_ticket_contexts(
         rag_sources=rag_sources,
         attachment_context=attachment_context,
     )
+    customer_name = customer.full_name if customer else "Cliente"
+    customer_email = customer.email if customer else ""
+    langfuse_prompt = get_langfuse_prompt(
+        "ticket-ai-response",
+        fallback=TICKET_AI_RESPONSE_PROMPT,
+    )
+    prompt = compile_langfuse_prompt(
+        langfuse_prompt,
+        TICKET_AI_RESPONSE_PROMPT,
+        customer_name=customer_name,
+        customer_email=customer_email,
+        ticket_subject=ticket.subject,
+        ticket_description=ticket.description,
+        ticket_priority=ticket.priority,
+        knowledge_context=knowledge_context,
+        attachments_context=attachments_context,
+    )
+    prompt_config = getattr(langfuse_prompt, "config", None) or {}
+    llm_model = prompt_config.get("model", llm_model)
+    temperature = prompt_config.get("temperature", ai_config.temperature)
 
     try:
         langfuse_callbacks = get_langfuse_callbacks()
-        response_text, processing_time_ms = await _call_openrouter_chat(
+        response_text, processing_time_ms, trace_id = await _call_openrouter_chat(
             api_key=api_key,
             model=llm_model,
-            temperature=ai_config.temperature,
+            temperature=temperature,
             prompt=prompt,
             callbacks=langfuse_callbacks,
+            langfuse_prompt=langfuse_prompt,
             trace_metadata={
                 "ticket_id": ticket.id,
                 "ticket_number": ticket.ticket_number,
                 "company_id": ticket.company_id,
                 "category_id": ticket.category_id,
                 "priority": ticket.priority,
+                "prompt_name": "ticket-ai-response",
+                "prompt_version": getattr(langfuse_prompt, "version", None),
             },
         )
 
@@ -341,9 +384,12 @@ async def generate_pending_ai_response(
             config_snapshot=_json_text(
                 {
                     "model": llm_model,
-                    "temperature": ai_config.temperature,
+                    "temperature": temperature,
                     "autonomy_level": ai_config.autonomy_level,
                     "tools_used": ["rag"],
+                    "prompt_name": "ticket-ai-response",
+                    "prompt_version": getattr(langfuse_prompt, "version", None),
+                    "langfuse_trace_id": trace_id,
                 }
             ),
             generated_at=datetime.now(),
