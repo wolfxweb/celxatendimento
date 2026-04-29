@@ -19,7 +19,12 @@ from app.models.ticket_attachment import TicketAttachment
 from app.models.ticket_ai_response import TicketAIResponse
 from app.models.user import User
 from app.services.rag_service import RAGService
-from app.ai.callbacks import get_langfuse_callbacks, get_langfuse_client
+from app.ai.callbacks import (
+    get_langfuse_callbacks,
+    get_langfuse_client,
+    get_langfuse_model_usage,
+    get_openai_usage_details,
+)
 
 LEGACY_LLM_MODEL_REPLACEMENTS = {
     "google/gemini-1.5-flash": "google/gemini-2.5-flash-lite",
@@ -208,12 +213,17 @@ async def _call_openrouter_chat(
         raise ValueError("OpenRouter não retornou conteúdo para a resposta")
 
     processing_time_ms = int((datetime.now() - start).total_seconds() * 1000)
+    usage_details = get_openai_usage_details(payload)
+    model_usage = get_langfuse_model_usage(payload)
     langfuse = get_langfuse_client()
     if langfuse:
         try:
             trace = langfuse.trace(
                 name="ticket-ai-response",
+                input=prompt,
+                output=content,
                 metadata=trace_metadata or {},
+                tags=["ticket", "ai-response", "openrouter"],
             )
             trace.generation(
                 name="openrouter-chat-completion",
@@ -221,6 +231,9 @@ async def _call_openrouter_chat(
                 input=prompt,
                 output=content,
                 model_parameters={"temperature": temperature},
+                usage=model_usage or None,
+                usage_details=usage_details or None,
+                metadata={"usage": payload.get("usage")},
             )
             langfuse.flush()
         except Exception:

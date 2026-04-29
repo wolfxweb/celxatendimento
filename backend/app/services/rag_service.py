@@ -13,6 +13,11 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decrypt_api_key
+from app.ai.callbacks import (
+    get_langfuse_client,
+    get_langfuse_model_usage,
+    get_openai_usage_details,
+)
 from app.models.company_ai_config import CompanyAIConfig
 from app.models.knowledge_base import KnowledgeBase
 
@@ -22,6 +27,41 @@ class RAGService:
 
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    def _trace_embedding_call(
+        self,
+        *,
+        name: str,
+        model: str,
+        input_text: str,
+        metadata: dict,
+        payload: dict,
+    ) -> None:
+        langfuse = get_langfuse_client()
+        if not langfuse:
+            return
+
+        usage_details = get_openai_usage_details(payload)
+        model_usage = get_langfuse_model_usage(payload)
+        try:
+            trace = langfuse.trace(
+                name=name,
+                input=input_text,
+                metadata=metadata,
+                tags=["rag", "embedding", "openrouter"],
+            )
+            trace.generation(
+                name="openrouter-embedding",
+                model=model,
+                input=input_text,
+                output={"embedding_dimensions": len(payload.get("data", [{}])[0].get("embedding") or [])},
+                usage=model_usage or None,
+                usage_details=usage_details or None,
+                metadata={"usage": payload.get("usage"), **metadata},
+            )
+            langfuse.flush()
+        except Exception as exc:
+            print(f"Langfuse embedding trace failed: {exc}")
 
     async def create_article(
         self,
@@ -192,6 +232,19 @@ class RAGService:
 
                     if response.status_code == 200:
                         payload = response.json()
+                        self._trace_embedding_call(
+                            name="rag-query-embedding",
+                            model=model,
+                            input_text=query,
+                            metadata={
+                                "company_id": int(company_id)
+                                if not isinstance(company_id, uuid.UUID)
+                                else str(company_id),
+                                "articles_with_embeddings": len(articles_with_embeddings),
+                                "top_k": top_k,
+                            },
+                            payload=payload,
+                        )
                         query_embedding = payload.get("data", [{}])[0].get("embedding")
 
                         if query_embedding:
@@ -433,6 +486,20 @@ class RAGService:
                 raise ValueError(f"OpenRouter retornou {response.status_code}: {detail}")
 
             payload = response.json()
+            self._trace_embedding_call(
+                name="rag-article-embedding",
+                model=model,
+                input_text=embedding_input,
+                metadata={
+                    "company_id": article.company_id,
+                    "article_id": article.id,
+                    "article_title": article.title,
+                    "original_filename": article.original_filename,
+                    "content_chars": len(article.content or ""),
+                    "embedding_input_chars": len(embedding_input),
+                },
+                payload=payload,
+            )
             embedding = payload.get("data", [{}])[0].get("embedding")
             if not embedding:
                 raise ValueError("OpenRouter não retornou embedding para este artigo")

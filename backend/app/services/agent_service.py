@@ -18,7 +18,11 @@ from sqlalchemy.orm import selectinload
 from app.models.agent_config import AgentConfig, AgentType, AutonomyLevel
 from app.models.agent_prompt import AgentPrompt, PromptType
 from app.models.company_ai_config import CompanyAIConfig
-from app.ai.callbacks import get_langfuse_client
+from app.ai.callbacks import (
+    get_langfuse_client,
+    get_langfuse_model_usage,
+    get_openai_usage_details,
+)
 from app.services.rag_service import RAGService
 
 
@@ -76,6 +80,9 @@ class AgentService:
         confidence: str,
         processing_time_ms: Optional[int],
         mode: str,
+        usage_details: Optional[dict] = None,
+        model_usage: Optional[dict] = None,
+        raw_usage: Optional[dict] = None,
     ) -> None:
         langfuse = get_langfuse_client()
         if not langfuse:
@@ -85,6 +92,8 @@ class AgentService:
             trace = langfuse.trace(
                 name="chat-kb",
                 user_id=user_id or "unknown",
+                input=query,
+                output=response,
                 metadata={
                     "company_id": company_id,
                     "agent_id": str(agent.id),
@@ -102,7 +111,9 @@ class AgentService:
                 input=query,
                 output=response,
                 model_parameters={"temperature": agent.temperature},
-                metadata={"sources": sources},
+                usage=model_usage or None,
+                usage_details=usage_details or None,
+                metadata={"sources": sources, "usage": raw_usage},
             )
             langfuse.flush()
         except Exception as exc:
@@ -167,7 +178,7 @@ Instruções para a resposta:
         model: str,
         temperature: float,
         prompt: str,
-    ) -> tuple[str, int]:
+    ) -> tuple[str, int, dict, dict, dict]:
         start = datetime.now()
 
         async with httpx.AsyncClient(timeout=90) as client:
@@ -201,7 +212,15 @@ Instruções para a resposta:
             raise ValueError("OpenRouter não retornou conteúdo para a resposta")
 
         processing_time_ms = int((datetime.now() - start).total_seconds() * 1000)
-        return content.strip(), processing_time_ms
+        usage_details = get_openai_usage_details(payload)
+        model_usage = get_langfuse_model_usage(payload)
+        return (
+            content.strip(),
+            processing_time_ms,
+            usage_details,
+            model_usage,
+            payload.get("usage") or {},
+        )
 
     # ==================== AGENT CRUD ====================
 
@@ -596,9 +615,18 @@ Instruções para a resposta:
             system_prompt=system_prompt,
             user_name=user_name,
         )
+        usage_details = {}
+        model_usage = {}
+        raw_usage = {}
 
         try:
-            response, processing_time_ms = await self._generate_kb_ai_response(
+            (
+                response,
+                processing_time_ms,
+                usage_details,
+                model_usage,
+                raw_usage,
+            ) = await self._generate_kb_ai_response(
                 api_key=api_key,
                 model=agent.llm_model,
                 temperature=agent.temperature,
@@ -624,6 +652,9 @@ Instruções para a resposta:
             confidence="medium",
             processing_time_ms=processing_time_ms,
             mode="fallback-rag-llm",
+            usage_details=usage_details,
+            model_usage=model_usage,
+            raw_usage=raw_usage,
         )
 
         return {
