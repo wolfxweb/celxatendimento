@@ -36,6 +36,16 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; gradient: string
   rejected: { bg: 'bg-red-500/10', text: 'text-red-600', gradient: 'from-red-500 to-pink-500', icon: '❌' },
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  open: 'Aberto',
+  pending_ai: 'Atendente',
+  pending_agent: 'Atendente',
+  pending_customer_feedback: 'Aguardando meu retorno',
+  resolved: 'Resolvido',
+  closed: 'Fechado',
+  rejected: 'Rejeitado',
+}
+
 const PRIORITY_STYLES: Record<string, { bg: string; text: string; gradient: string }> = {
   critical: { bg: 'bg-red-500/10', text: 'text-red-600', gradient: 'from-red-500 to-red-600' },
   high: { bg: 'bg-orange-500/10', text: 'text-orange-600', gradient: 'from-orange-500 to-orange-600' },
@@ -69,6 +79,14 @@ export default function ClienteTicketsPage() {
 
   useEffect(() => {
     loadCategories()
+  }, [])
+
+  useEffect(() => {
+    const status = new URLSearchParams(window.location.search).get('status')
+    if (status) {
+      setFilter(status)
+      setPage(1)
+    }
   }, [])
 
   useEffect(() => {
@@ -288,7 +306,7 @@ export default function ClienteTicketsPage() {
                             <span className="text-sm font-mono text-slate-400">{ticket.ticket_number}</span>
                             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium ${statusStyle.bg} ${statusStyle.text}`}>
                               <span className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${statusStyle.gradient}`}></span>
-                              {statusStyle.icon} {ticket.status.replace('_', ' ')}
+                              {statusStyle.icon} {STATUS_LABELS[ticket.status] || ticket.status}
                             </span>
                           </div>
 

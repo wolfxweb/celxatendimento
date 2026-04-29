@@ -90,6 +90,11 @@ class MessageCreate(MessageBase):
     is_internal: bool = False
 
 
+class MessageUpdate(BaseModel):
+    content: str = Field(..., min_length=1)
+    is_internal: Optional[bool] = None
+
+
 class MessageResponse(MessageBase):
     id: int
     ticket_id: int
@@ -119,6 +124,7 @@ class TicketDetailResponse(TicketResponse):
 
 
 class AIResponseAction(BaseModel):
+    ai_response_id: Optional[int] = None
     rating: Optional[int] = Field(None, ge=1, le=5)
     feedback: Optional[str] = None
     rejection_reason: Optional[str] = None
@@ -133,6 +139,7 @@ class AIResponseReject(AIResponseAction):
 
 
 class AIResponseEdit(BaseModel):
+    ai_response_id: Optional[int] = None
     edited_response: str
     rating: Optional[int] = Field(None, ge=1, le=5)
     feedback: Optional[str] = None

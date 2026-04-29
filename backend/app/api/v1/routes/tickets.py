@@ -26,6 +26,7 @@ from app.schemas.ticket import (
     TicketDetailResponse,
     MessageResponse,
     MessageCreate,
+    MessageUpdate,
     TicketAssignmentRequest,
     TicketStatusUpdate,
     AIResponseApprove,
@@ -36,6 +37,12 @@ from app.schemas.ticket import (
 )
 
 router = APIRouter(prefix="/tickets", tags=["tickets"])
+
+
+def json_text(value: dict | None) -> str | None:
+    if not value:
+        return None
+    return json.dumps(value, default=str, ensure_ascii=False)
 
 
 @router.get("/ai/stats", status_code=status.HTTP_200_OK)
@@ -425,6 +432,7 @@ async def get_ticket(
 async def update_ticket(
     ticket_id: str,
     ticket_data: TicketUpdate,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
@@ -439,10 +447,25 @@ async def update_ticket(
             detail="Ticket not found",
         )
 
+    if current_user.role == "customer" and ticket.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied",
+        )
+
     # Update fields
     update_data = ticket_data.model_dump(exclude_unset=True)
+    if current_user.role == "customer":
+        update_data.pop("assigned_to", None)
+
+    old_values = {}
+    new_values = {}
     for key, value in update_data.items():
-        setattr(ticket, key, value)
+        old_value = getattr(ticket, key)
+        if old_value != value:
+            old_values[key] = old_value
+            new_values[key] = value
+            setattr(ticket, key, value)
 
     # Handle status change timestamps
     if ticket_data.status:
@@ -450,6 +473,21 @@ async def update_ticket(
             ticket.first_response_at = datetime.now()
         elif ticket_data.status in ["resolved", "closed"]:
             ticket.resolved_at = datetime.now()
+
+    if new_values:
+        from app.models.ticket_audit_log import TicketAuditLog
+
+        audit_log = TicketAuditLog(
+            ticket_id=ticket.id,
+            action_type="ticket_updated",
+            user_id=current_user.id,
+            user_role=current_user.role,
+            old_values=json_text(old_values),
+            new_values=json_text(new_values),
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+        )
+        db.add(audit_log)
 
     await db.commit()
     await db.refresh(ticket)
@@ -496,6 +534,96 @@ async def add_message(
     # First response tracking
     if not ticket.first_response_at:
         ticket.first_response_at = datetime.now()
+
+    await db.commit()
+    await db.refresh(message)
+
+    return MessageResponse(
+        id=message.id,
+        ticket_id=message.ticket_id,
+        author_id=message.author_id,
+        author_name=current_user.full_name,
+        author_role=current_user.role,
+        content=message.content,
+        message_type=message.message_type,
+        ai_response_id=message.ai_response_id,
+        was_edited=message.was_edited,
+        original_ai_text=message.original_ai_text,
+        is_internal=message.is_internal,
+        created_at=message.created_at,
+    )
+
+
+@router.patch("/{ticket_id}/messages/{message_id}", response_model=MessageResponse)
+async def update_message(
+    ticket_id: str,
+    message_id: int,
+    message_data: MessageUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """Edit an agent/admin message in a ticket."""
+
+    if current_user.role not in ["agent", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only agents and admins can edit messages",
+        )
+
+    ticket_result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
+    ticket = ticket_result.scalar_one_or_none()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+
+    msg_result = await db.execute(
+        select(TicketMessage).where(
+            and_(
+                TicketMessage.id == message_id,
+                TicketMessage.ticket_id == ticket.id,
+                TicketMessage.is_deleted.is_(False),
+            )
+        )
+    )
+    message = msg_result.scalar_one_or_none()
+
+    if not message:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Message not found",
+        )
+
+    if message.message_type not in ["agent", "note"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Only agent messages can be edited here",
+        )
+
+    original_content = message.content
+    message.content = message_data.content.strip()
+    message.was_edited = True
+    if not message.original_ai_text:
+        message.original_ai_text = original_content
+    if message_data.is_internal is not None:
+        message.is_internal = message_data.is_internal
+        message.message_type = "note" if message_data.is_internal else "agent"
+
+    ticket.updated_at = datetime.now()
+
+    from app.models.ticket_audit_log import TicketAuditLog
+
+    audit_log = TicketAuditLog(
+        ticket_id=ticket.id,
+        action_type="message_edited",
+        user_id=current_user.id,
+        user_role=current_user.role,
+        old_values=json_text({"message_id": message.id, "content": original_content}),
+        new_values=json_text({"message_id": message.id, "content": message.content}),
+    )
+    db.add(audit_log)
 
     await db.commit()
     await db.refresh(message)
@@ -563,6 +691,55 @@ async def assign_ticket(
     return ticket
 
 
+@router.get("/{ticket_id}/ai/responses", response_model=list)
+async def list_ticket_ai_responses(
+    ticket_id: str,
+    status_filter: str = "pending",
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    """List AI responses available for review in a ticket."""
+
+    if current_user.role not in ["agent", "admin"]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only agents and admins can review AI responses",
+        )
+
+    result = await db.execute(select(Ticket).where(Ticket.id == int(ticket_id)))
+    ticket = result.scalar_one_or_none()
+
+    if not ticket:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Ticket not found",
+        )
+
+    query = select(TicketAIResponse).where(TicketAIResponse.ticket_id == ticket.id)
+    if status_filter:
+        query = query.where(TicketAIResponse.status == status_filter)
+
+    ai_result = await db.execute(query.order_by(TicketAIResponse.generated_at.desc()))
+    responses = ai_result.scalars().all()
+
+    return [
+        {
+            "id": response.id,
+            "ticket_id": response.ticket_id,
+            "response_text": response.response_text,
+            "context_used": parse_json_text(response.context_used),
+            "generated_at": response.generated_at,
+            "processing_time_ms": response.processing_time_ms,
+            "status": response.status,
+            "ai_rating": response.ai_rating,
+            "ai_feedback": response.ai_feedback,
+            "is_example_good": response.is_example_good,
+            "is_example_bad": response.is_example_bad,
+        }
+        for response in responses
+    ]
+
+
 @router.post("/{ticket_id}/ai/approve", response_model=TicketResponse)
 async def approve_ai_response(
     ticket_id: str,
@@ -588,14 +765,15 @@ async def approve_ai_response(
         )
 
     # Get pending AI response
-    ai_result = await db.execute(
-        select(TicketAIResponse).where(
-            and_(
-                TicketAIResponse.ticket_id == ticket.id,
-                TicketAIResponse.status == "pending",
-            )
+    ai_query = select(TicketAIResponse).where(
+        and_(
+            TicketAIResponse.ticket_id == ticket.id,
+            TicketAIResponse.status == "pending",
         )
     )
+    if approval.ai_response_id:
+        ai_query = ai_query.where(TicketAIResponse.id == approval.ai_response_id)
+    ai_result = await db.execute(ai_query.order_by(TicketAIResponse.generated_at.desc()).limit(1))
     ai_response = ai_result.scalar_one_or_none()
 
     if not ai_response:
@@ -658,14 +836,15 @@ async def reject_ai_response(
         )
 
     # Get pending AI response
-    ai_result = await db.execute(
-        select(TicketAIResponse).where(
-            and_(
-                TicketAIResponse.ticket_id == ticket.id,
-                TicketAIResponse.status == "pending",
-            )
+    ai_query = select(TicketAIResponse).where(
+        and_(
+            TicketAIResponse.ticket_id == ticket.id,
+            TicketAIResponse.status == "pending",
         )
     )
+    if rejection.ai_response_id:
+        ai_query = ai_query.where(TicketAIResponse.id == rejection.ai_response_id)
+    ai_result = await db.execute(ai_query.order_by(TicketAIResponse.generated_at.desc()).limit(1))
     ai_response = ai_result.scalar_one_or_none()
 
     if not ai_response:
@@ -727,14 +906,15 @@ async def edit_ai_response(
         )
 
     # Get pending AI response
-    ai_result = await db.execute(
-        select(TicketAIResponse).where(
-            and_(
-                TicketAIResponse.ticket_id == ticket.id,
-                TicketAIResponse.status == "pending",
-            )
+    ai_query = select(TicketAIResponse).where(
+        and_(
+            TicketAIResponse.ticket_id == ticket.id,
+            TicketAIResponse.status == "pending",
         )
     )
+    if edit.ai_response_id:
+        ai_query = ai_query.where(TicketAIResponse.id == edit.ai_response_id)
+    ai_result = await db.execute(ai_query.order_by(TicketAIResponse.generated_at.desc()).limit(1))
     ai_response = ai_result.scalar_one_or_none()
 
     if not ai_response:
@@ -941,7 +1121,7 @@ async def rate_ticket(
         action_type="rating_added",
         user_id=current_user.id,
         user_role=current_user.role,
-        new_values={"rating": rating, "comment": comment},
+        new_values=json_text({"rating": rating, "comment": comment}),
     )
     db.add(audit_log)
 
@@ -1085,11 +1265,11 @@ async def create_ticket_relation(
         action_type="relation_added",
         user_id=current_user.id,
         user_role=current_user.role,
-        new_values={
+        new_values=json_text({
             "relation_type": relation_type,
             "related_ticket_id": related_ticket_id,
             "description": description,
-        },
+        }),
     )
     db.add(audit_log)
 
@@ -1138,7 +1318,7 @@ async def delete_ticket_relation(
         action_type="relation_removed",
         user_id=current_user.id,
         user_role=current_user.role,
-        old_values={"relation_type": relation.relation_type},
+        old_values=json_text({"relation_type": relation.relation_type}),
     )
     db.add(audit_log)
 
@@ -1178,8 +1358,8 @@ async def get_ticket_audit_log(
             "action_type": log.action_type,
             "user_id": str(log.user_id) if log.user_id else None,
             "user_role": log.user_role,
-            "old_values": log.old_values,
-            "new_values": log.new_values,
+            "old_values": parse_json_text(log.old_values),
+            "new_values": parse_json_text(log.new_values),
             "ip_address": log.ip_address,
             "created_at": log.created_at,
         }

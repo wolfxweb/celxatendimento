@@ -96,6 +96,20 @@ interface Agent {
   email: string
 }
 
+interface AIResponse {
+  id: number
+  ticket_id: number
+  response_text: string
+  context_used: any
+  generated_at: string
+  processing_time_ms: number | null
+  status: string
+  ai_rating: number | null
+  ai_feedback: string | null
+  is_example_good: boolean
+  is_example_bad: boolean
+}
+
 const STATUS_LABELS: Record<string, string> = {
   open: 'Aberto',
   pending_ai: 'Aprovação pendente',
@@ -157,6 +171,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   ai_response_approved: 'Resposta IA aprovada',
   ai_response_rejected: 'Resposta IA rejeitada',
   ai_response_edited: 'Resposta IA editada',
+  message_edited: 'Mensagem editada',
   message_added: 'Mensagem adicionada',
   note_added: 'Nota adicionada',
   escalated: 'Escalado',
@@ -165,7 +180,7 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   rating_added: 'Avaliação adicionada',
 }
 
-type TabType = 'mensagens' | 'responder' | 'relacionados' | 'alteracoes' | 'anexos'
+type TabType = 'mensagens' | 'aprovacao' | 'responder' | 'relacionados' | 'alteracoes' | 'anexos'
 
 const ALLOWED_FILE_TYPES = ['.jpg', '.jpeg', '.png', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.zip']
 const MAX_FILE_SIZE_MB = 10
@@ -182,6 +197,8 @@ export default function AtendenteTicketDetailPage() {
   const [relations, setRelations] = useState<TicketRelation[]>([])
   const [auditLog, setAuditLog] = useState<AuditLog[]>([])
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [aiResponses, setAiResponses] = useState<AIResponse[]>([])
+  const [editedAiResponses, setEditedAiResponses] = useState<Record<number, string>>({})
   const [pendingFiles, setPendingFiles] = useState<FilePreview[]>([])
   const [activeTab, setActiveTab] = useState<TabType>('mensagens')
   const [loading, setLoading] = useState(true)
@@ -190,6 +207,11 @@ export default function AtendenteTicketDetailPage() {
   const [isInternal, setIsInternal] = useState(false)
   const [sending, setSending] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
+  const [processingAiResponse, setProcessingAiResponse] = useState<number | null>(null)
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null)
+  const [editingMessageContent, setEditingMessageContent] = useState('')
+  const [editingMessageInternal, setEditingMessageInternal] = useState(false)
+  const [savingMessageEdit, setSavingMessageEdit] = useState(false)
 
   useEffect(() => {
     if (ticketId) {
@@ -267,14 +289,77 @@ export default function AtendenteTicketDetailPage() {
     }
   }
 
+  async function loadAIResponses() {
+    try {
+      const data = await apiFetch<AIResponse[]>(`/tickets/${ticketId}/ai/responses`)
+      setAiResponses(data)
+      setEditedAiResponses(
+        data.reduce<Record<number, string>>((acc, response) => {
+          acc[response.id] = response.response_text
+          return acc
+        }, {})
+      )
+    } catch (err) {
+      console.error('Erro ao carregar respostas IA:', err)
+    }
+  }
+
   function handleTabChange(tab: TabType) {
     setActiveTab(tab)
-    if (tab === 'relacionados' && relations.length === 0) {
+    if (tab === 'aprovacao' && aiResponses.length === 0) {
+      loadAIResponses()
+    } else if (tab === 'relacionados' && relations.length === 0) {
       loadRelations()
     } else if (tab === 'alteracoes' && auditLog.length === 0) {
       loadAuditLog()
     } else if (tab === 'anexos' && attachments.length === 0) {
       loadAttachments()
+    }
+  }
+
+  async function handleApproveAIResponse(response: AIResponse) {
+    const editedText = editedAiResponses[response.id]?.trim()
+    setProcessingAiResponse(response.id)
+    try {
+      if (editedText && editedText !== response.response_text.trim()) {
+        await apiPost(`/tickets/${ticketId}/ai/edit`, {
+          ai_response_id: response.id,
+          edited_response: editedText,
+        })
+      } else {
+        await apiPost(`/tickets/${ticketId}/ai/approve`, {
+          ai_response_id: response.id,
+          rating: null,
+          feedback: null,
+        })
+      }
+      await loadTicket()
+      await loadAIResponses()
+    } catch (err) {
+      alert('Erro ao aprovar resposta')
+    } finally {
+      setProcessingAiResponse(null)
+    }
+  }
+
+  async function handleRejectAIResponse(response: AIResponse) {
+    const reason = prompt('Motivo da rejeição:')
+    if (!reason) return
+
+    setProcessingAiResponse(response.id)
+    try {
+      await apiPost(`/tickets/${ticketId}/ai/reject`, {
+        ai_response_id: response.id,
+        rejection_reason: reason,
+        rating: null,
+        feedback: null,
+      })
+      await loadTicket()
+      await loadAIResponses()
+    } catch (err) {
+      alert('Erro ao rejeitar resposta')
+    } finally {
+      setProcessingAiResponse(null)
     }
   }
 
@@ -368,6 +453,37 @@ export default function AtendenteTicketDetailPage() {
       alert(message)
     } finally {
       setSending(false)
+    }
+  }
+
+  function startEditMessage(message: Message) {
+    setEditingMessageId(message.id)
+    setEditingMessageContent(message.content)
+    setEditingMessageInternal(message.is_internal)
+  }
+
+  async function saveMessageEdit(messageId: number) {
+    if (!editingMessageContent.trim()) return
+
+    setSavingMessageEdit(true)
+    try {
+      await apiPatch(`/tickets/${ticketId}/messages/${messageId}`, {
+        content: editingMessageContent.trim(),
+        is_internal: editingMessageInternal,
+      })
+      setEditingMessageId(null)
+      setEditingMessageContent('')
+      setEditingMessageInternal(false)
+      await loadTicket()
+      if (activeTab === 'alteracoes') {
+        await loadAuditLog()
+      } else {
+        setAuditLog([])
+      }
+    } catch (err) {
+      alert('Erro ao editar mensagem')
+    } finally {
+      setSavingMessageEdit(false)
     }
   }
 
@@ -578,7 +694,7 @@ export default function AtendenteTicketDetailPage() {
       <div className="rounded-2xl bg-white shadow-card-modern border border-slate-100 overflow-hidden">
         <div className="border-b border-slate-100">
           <div className="flex">
-            {(['mensagens', 'responder', 'relacionados', 'alteracoes', 'anexos'] as TabType[]).map((tab) => (
+            {(['mensagens', 'aprovacao', 'responder', 'relacionados', 'alteracoes', 'anexos'] as TabType[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => handleTabChange(tab)}
@@ -588,7 +704,13 @@ export default function AtendenteTicketDetailPage() {
                     : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                 }`}
               >
-                {tab === 'anexos' ? `Anexos (${attachments.length})` : tab === 'responder' ? 'Responder' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                {tab === 'anexos'
+                  ? `Anexos (${attachments.length})`
+                  : tab === 'responder'
+                    ? 'Responder'
+                    : tab === 'aprovacao'
+                      ? `Aprovação${aiResponses.length > 0 ? ` (${aiResponses.length})` : ''}`
+                      : tab.charAt(0).toUpperCase() + tab.slice(1)}
                 {tab === 'mensagens' && ` (${ticket.messages.length})`}
               </button>
             ))}
@@ -643,15 +765,69 @@ export default function AtendenteTicketDetailPage() {
                           ✨ IA
                         </span>
                       )}
+                      {msg.was_edited && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                          Editada
+                        </span>
+                      )}
                       <span className="text-xs text-slate-400 ml-auto">{formatDate(msg.created_at)}</span>
+                      {(msg.message_type === 'agent' || msg.message_type === 'note') && (
+                        <button
+                          type="button"
+                          onClick={() => startEditMessage(msg)}
+                          className="text-xs px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:border-primary-200 hover:text-primary-600"
+                        >
+                          Editar
+                        </button>
+                      )}
                     </div>
 
-                    <p className="text-slate-700 whitespace-pre-wrap">{msg.content}</p>
+                    {editingMessageId === msg.id ? (
+                      <div className="space-y-3">
+                        <textarea
+                          value={editingMessageContent}
+                          onChange={(event) => setEditingMessageContent(event.target.value)}
+                          rows={5}
+                          className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-700 outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <label className="flex items-center gap-2 text-sm text-slate-600">
+                            <input
+                              type="checkbox"
+                              checked={editingMessageInternal}
+                              onChange={(event) => setEditingMessageInternal(event.target.checked)}
+                              className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                            />
+                            Nota interna
+                          </label>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingMessageId(null)}
+                              disabled={savingMessageEdit}
+                              className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                            >
+                              Cancelar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => saveMessageEdit(msg.id)}
+                              disabled={savingMessageEdit || !editingMessageContent.trim()}
+                              className="px-4 py-2 rounded-lg bg-gradient-primary text-sm font-semibold text-white shadow-lg hover:shadow-glow-primary disabled:opacity-50"
+                            >
+                              {savingMessageEdit ? 'Salvando...' : 'Salvar'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-slate-700 whitespace-pre-wrap">{msg.content}</p>
+                    )}
 
                     {msg.was_edited && msg.original_ai_text && (
                       <details className="mt-3">
                         <summary className="text-sm text-primary-600 cursor-pointer hover:text-primary-700">
-                          Ver resposta original da IA
+                          {msg.message_type === 'ai_approved' ? 'Ver resposta original da IA' : 'Ver texto original'}
                         </summary>
                         <p className="mt-2 p-3 rounded-lg bg-slate-100 text-slate-600 text-sm font-mono">
                           {msg.original_ai_text}
@@ -661,6 +837,104 @@ export default function AtendenteTicketDetailPage() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {activeTab === 'aprovacao' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-700">Respostas disponíveis para aprovação</h3>
+                  <p className="text-sm text-slate-500">Revise, edite se necessário, aprove e envie ao cliente.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={loadAIResponses}
+                  className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Atualizar
+                </button>
+              </div>
+
+              {aiResponses.length === 0 ? (
+                <div className="text-center py-12 rounded-xl border border-dashed border-slate-200">
+                  <div className="text-5xl mb-3">🤖</div>
+                  <p className="font-medium text-slate-700">Nenhuma resposta pendente</p>
+                  <p className="mt-1 text-sm text-slate-500">Quando a IA gerar uma resposta para este chamado, ela aparecerá aqui.</p>
+                </div>
+              ) : (
+                aiResponses.map((response, index) => (
+                  <div key={response.id} className="rounded-xl border border-amber-100 bg-gradient-to-br from-amber-50/60 to-violet-50/40 overflow-hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-b border-amber-100 bg-white/70 p-4">
+                      <div className="flex items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10 text-lg">🤖</span>
+                        <div>
+                          <div className="font-semibold text-slate-800">Resposta IA #{index + 1}</div>
+                          <div className="text-xs text-slate-500">
+                            Gerada em {formatDate(response.generated_at)}
+                            {response.processing_time_ms ? ` · ${response.processing_time_ms}ms` : ''}
+                          </div>
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                        Pendente
+                      </span>
+                    </div>
+
+                    <div className="space-y-4 p-4">
+                      <textarea
+                        value={editedAiResponses[response.id] ?? response.response_text}
+                        onChange={(event) =>
+                          setEditedAiResponses((current) => ({
+                            ...current,
+                            [response.id]: event.target.value,
+                          }))
+                        }
+                        disabled={processingAiResponse === response.id}
+                        rows={10}
+                        className="w-full min-h-[260px] rounded-xl border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-700 shadow-inner outline-none transition-all focus:border-violet-400 focus:ring-2 focus:ring-violet-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      />
+
+                      {response.context_used?.rag_sources?.length > 0 && (
+                        <details className="rounded-xl overflow-hidden border border-slate-200 bg-white">
+                          <summary className="px-4 py-3 bg-slate-100 cursor-pointer text-sm font-medium text-slate-700 hover:bg-slate-200 transition-colors">
+                            📚 Ver fontes RAG ({response.context_used.rag_sources.length})
+                          </summary>
+                          <div className="p-4 space-y-3">
+                            {response.context_used.rag_sources.map((source: any, sourceIndex: number) => (
+                              <div key={sourceIndex} className="p-3 rounded-lg bg-slate-50 border border-slate-100">
+                                <span className="font-medium text-slate-700">{source.title || `Fonte ${sourceIndex + 1}`}</span>
+                                {source.content && <p className="text-sm text-slate-600 mt-1">{source.content}</p>}
+                              </div>
+                            ))}
+                          </div>
+                        </details>
+                      )}
+
+                      <div className="flex flex-wrap gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleApproveAIResponse(response)}
+                          disabled={processingAiResponse === response.id}
+                          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-white font-medium shadow-lg hover:shadow-glow-primary transition-all disabled:opacity-50"
+                        >
+                          <span>✓</span>
+                          Aprovar e enviar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRejectAIResponse(response)}
+                          disabled={processingAiResponse === response.id}
+                          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-500 to-pink-500 text-white font-medium shadow-lg hover:scale-105 transition-all disabled:opacity-50"
+                        >
+                          <span>✗</span>
+                          Rejeitar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
 

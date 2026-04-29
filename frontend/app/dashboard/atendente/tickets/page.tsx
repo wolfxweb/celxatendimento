@@ -98,6 +98,14 @@ export default function AtendenteTicketsPage() {
   }, [])
 
   useEffect(() => {
+    const status = new URLSearchParams(window.location.search).get('status')
+    if (status) {
+      setFilter(status)
+      setPage(1)
+    }
+  }, [])
+
+  useEffect(() => {
     loadTickets()
   }, [filter, customerName, assignedTo, categoryId, dateFrom, dateTo, page])
 

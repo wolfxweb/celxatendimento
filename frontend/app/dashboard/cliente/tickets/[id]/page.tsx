@@ -17,6 +17,11 @@ interface Attachment {
   storage_url: string | null
 }
 
+interface CategoryActive {
+  id: number
+  name: string
+}
+
 interface FilePreview {
   id: string
   file: File
@@ -134,9 +139,33 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
   closed: 'Fechado',
   reopened: 'Reaberto',
   rating_added: 'Avaliação adicionada',
+  ticket_updated: 'Ticket editado',
 }
 
 type TabType = 'mensagens' | 'relacionados' | 'alteracoes' | 'anexos'
+
+const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Baixa' },
+  { value: 'medium', label: 'Média' },
+  { value: 'high', label: 'Alta' },
+  { value: 'critical', label: 'Crítica' },
+]
+
+const AUDIT_FIELD_LABELS: Record<string, string> = {
+  subject: 'Assunto',
+  description: 'Descrição',
+  category_id: 'Categoria',
+  priority: 'Prioridade',
+  status: 'Status',
+  assigned_to: 'Responsável',
+}
+
+const USER_ROLE_LABELS: Record<string, string> = {
+  customer: 'Cliente',
+  agent: 'Atendente',
+  admin: 'Administrador',
+  superadmin: 'Super Admin',
+}
 
 const ALLOWED_FILE_TYPES = ['.jpg', '.jpeg', '.png', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.txt', '.zip']
 const MAX_FILE_SIZE_MB = 10
@@ -151,6 +180,7 @@ export default function TicketDetailPage() {
   const [relations, setRelations] = useState<TicketRelation[]>([])
   const [auditLog, setAuditLog] = useState<AuditLog[]>([])
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [categories, setCategories] = useState<CategoryActive[]>([])
   const [pendingFiles, setPendingFiles] = useState<FilePreview[]>([])
   const [activeTab, setActiveTab] = useState<TabType>('mensagens')
   const [loading, setLoading] = useState(true)
@@ -159,6 +189,12 @@ export default function TicketDetailPage() {
   const [sending, setSending] = useState(false)
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const [pendingStatus, setPendingStatus] = useState<string | null>(null)
+  const [editingTicket, setEditingTicket] = useState(false)
+  const [savingTicket, setSavingTicket] = useState(false)
+  const [editSubject, setEditSubject] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editCategoryId, setEditCategoryId] = useState<number | ''>('')
+  const [editPriority, setEditPriority] = useState('medium')
 
   useEffect(() => {
     if (ticketId) {
@@ -205,12 +241,63 @@ export default function TicketDetailPage() {
     }
   }
 
+  async function loadCategories() {
+    try {
+      const data = await apiFetch<{ categories: CategoryActive[] }>('/categories/active')
+      setCategories(data.categories)
+    } catch (err) {
+      console.error('Erro ao carregar categorias:', err)
+    }
+  }
+
+  function startTicketEdit() {
+    if (!ticket) return
+
+    setEditSubject(ticket.subject)
+    setEditDescription(ticket.description || '')
+    setEditCategoryId(ticket.category_id || '')
+    setEditPriority(ticket.priority)
+    setEditingTicket(true)
+
+    if (categories.length === 0) {
+      loadCategories()
+    }
+  }
+
+  async function saveTicketEdit() {
+    if (!ticket || !editSubject.trim()) return
+
+    setSavingTicket(true)
+    try {
+      await apiPatch(`/tickets/${ticketId}`, {
+        subject: editSubject.trim(),
+        description: editDescription,
+        category_id: editCategoryId || null,
+        priority: editPriority,
+      })
+      setEditingTicket(false)
+      await loadTicket()
+      if (activeTab === 'alteracoes') {
+        await loadAuditLog()
+      } else {
+        setAuditLog([])
+      }
+    } catch (err) {
+      alert('Erro ao editar ticket')
+    } finally {
+      setSavingTicket(false)
+    }
+  }
+
   function handleTabChange(tab: TabType) {
     setActiveTab(tab)
     if (tab === 'relacionados' && relations.length === 0) {
       loadRelations()
     } else if (tab === 'alteracoes' && auditLog.length === 0) {
       loadAuditLog()
+      if (categories.length === 0) {
+        loadCategories()
+      }
     } else if (tab === 'anexos' && attachments.length === 0) {
       loadAttachments()
     }
@@ -357,13 +444,26 @@ export default function TicketDetailPage() {
 
   const STATUS_OPTIONS = [
     { value: 'open', label: 'Aberto' },
-    { value: 'pending_ai', label: 'Pendente IA' },
-    { value: 'pending_agent', label: 'Pendente Agente' },
+    { value: 'pending_agent', label: 'Atendente' },
     { value: 'pending_customer_feedback', label: 'Aguardando Feedback' },
     { value: 'resolved', label: 'Resolvido' },
     { value: 'closed', label: 'Fechado' },
     { value: 'rejected', label: 'Rejeitado' },
   ]
+
+  function formatAuditValue(key: string, value: unknown) {
+    if (value === null || value === undefined || value === '') return 'Removido'
+    if (key === 'priority') {
+      return PRIORITY_OPTIONS.find((option) => option.value === value)?.label || String(value)
+    }
+    if (key === 'status') {
+      return STATUS_OPTIONS.find((option) => option.value === value)?.label || String(value)
+    }
+    if (key === 'category_id') {
+      return categories.find((category) => category.id === Number(value))?.name || `Categoria ${String(value)}`
+    }
+    return String(value)
+  }
 
   if (loading) {
     return (
@@ -383,10 +483,11 @@ export default function TicketDetailPage() {
     )
   }
 
-  const statusStyle = STATUS_STYLES[ticket.status] || STATUS_STYLES.open
+  const publicStatus = ticket.status === 'pending_ai' ? 'pending_agent' : ticket.status
+  const statusStyle = STATUS_STYLES[publicStatus] || STATUS_STYLES.open
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="w-full space-y-6">
       {/* Header Card */}
       <div className="p-6 rounded-2xl bg-white shadow-card-modern border border-slate-100">
         <div className="flex justify-between items-start gap-4">
@@ -394,7 +495,7 @@ export default function TicketDetailPage() {
             <div className="flex items-center gap-3">
               <span className="text-sm font-mono text-slate-400">{ticket.ticket_number}</span>
               <select
-                value={ticket.status}
+                value={publicStatus}
                 onChange={(e) => handleStatusChange(e.target.value)}
                 disabled={updatingStatus}
                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-sm font-medium border-0 cursor-pointer ${statusStyle.bg} ${statusStyle.text} ${updatingStatus ? 'opacity-50' : ''}`}
@@ -513,8 +614,104 @@ export default function TicketDetailPage() {
                   </span>
                   <span className="font-semibold text-slate-700">{ticket.user_name}</span>
                   <span className="text-xs text-slate-400 ml-auto">{formatDate(ticket.created_at)}</span>
+                  {!editingTicket && (
+                    <button
+                      type="button"
+                      onClick={startTicketEdit}
+                      className="px-3 py-1 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 hover:border-primary-200 hover:text-primary-600"
+                    >
+                      Editar dados
+                    </button>
+                  )}
                 </div>
-                <p className="text-slate-700 whitespace-pre-wrap">{ticket.description}</p>
+                {editingTicket ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="edit-subject" className="block text-sm font-semibold text-slate-700 mb-1">
+                        Assunto
+                      </label>
+                      <input
+                        id="edit-subject"
+                        type="text"
+                        value={editSubject}
+                        onChange={(e) => setEditSubject(e.target.value)}
+                        maxLength={200}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-description" className="block text-sm font-semibold text-slate-700 mb-1">
+                        Descrição
+                      </label>
+                      <textarea
+                        id="edit-description"
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        maxLength={5000}
+                        rows={5}
+                        className="w-full resize-none px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+                      />
+                      <span className="text-xs text-slate-400">{editDescription.length}/5000</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="edit-category" className="block text-sm font-semibold text-slate-700 mb-1">
+                          Categoria
+                        </label>
+                        <select
+                          id="edit-category"
+                          value={editCategoryId}
+                          onChange={(e) => setEditCategoryId(e.target.value ? Number(e.target.value) : '')}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+                        >
+                          <option value="">Sem categoria</option>
+                          {categories.map((category) => (
+                            <option key={category.id} value={category.id}>{category.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label htmlFor="edit-priority" className="block text-sm font-semibold text-slate-700 mb-1">
+                          Prioridade
+                        </label>
+                        <select
+                          id="edit-priority"
+                          value={editPriority}
+                          onChange={(e) => setEditPriority(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-sm focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20"
+                        >
+                          {PRIORITY_OPTIONS.map((priority) => (
+                            <option key={priority.value} value={priority.value}>{priority.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditingTicket(false)}
+                        disabled={savingTicket}
+                        className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveTicketEdit}
+                        disabled={savingTicket || !editSubject.trim()}
+                        className="px-4 py-2 rounded-lg bg-gradient-primary text-sm font-semibold text-white shadow-lg hover:shadow-glow-primary disabled:opacity-50"
+                      >
+                        {savingTicket ? 'Salvando...' : 'Salvar alterações'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-slate-700 whitespace-pre-wrap">{ticket.description || 'Sem descrição'}</p>
+                )}
               </div>
 
               {/* Messages */}
@@ -641,7 +838,7 @@ export default function TicketDetailPage() {
                               log.user_role === 'admin' ? 'bg-violet-100 text-violet-700' :
                               'bg-slate-100 text-slate-700'
                             }`}>
-                              {log.user_role}
+                              {USER_ROLE_LABELS[log.user_role] || log.user_role}
                             </span>
                           )}
                         </div>
@@ -649,7 +846,14 @@ export default function TicketDetailPage() {
                           <div className="mt-1 text-sm text-slate-500 flex flex-wrap gap-2">
                             {Object.entries(log.new_values).map(([key, value]) => (
                               <span key={key} className="px-2 py-1 rounded bg-slate-100">
-                                <span className="text-slate-400">{key}:</span> <strong className="text-slate-700">{String(value)}</strong>
+                                <span className="text-slate-400">{AUDIT_FIELD_LABELS[key] || key}:</span>{' '}
+                                {log.old_values?.[key] !== undefined && (
+                                  <>
+                                    <span className="line-through text-slate-400">{formatAuditValue(key, log.old_values[key])}</span>
+                                    <span className="text-slate-400"> → </span>
+                                  </>
+                                )}
+                                <strong className="text-slate-700">{formatAuditValue(key, value)}</strong>
                               </span>
                             ))}
                           </div>
