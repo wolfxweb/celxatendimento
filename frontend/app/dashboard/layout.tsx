@@ -182,50 +182,6 @@ export default function DashboardLayout({
 
       {/* Main Content Area */}
       <div className={`transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
-        {/* Top Header Bar */}
-        <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-slate-200/50 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex justify-between items-center gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                type="button"
-                onClick={() => setSidebarOpen(true)}
-                className="md:hidden shrink-0 p-2 rounded-xl bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
-                aria-label="Abrir menu"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16" />
-                </svg>
-              </button>
-              <div className="min-w-0">
-              <h2 className="text-lg font-semibold text-slate-800">
-                Olá, <span className="text-primary-600">{user?.full_name?.split(' ')[0]}</span> 👋
-              </h2>
-              <p className="text-sm text-slate-500">
-                {new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
-              </p>
-              </div>
-            </div>
-            
-            <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-              {/* Role Badge */}
-              <span className={`px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wider ${
-                user?.role === 'superadmin' ? 'bg-amber-100 text-amber-700' :
-                user?.role === 'admin' ? 'bg-violet-100 text-violet-700' :
-                user?.role === 'agent' ? 'bg-cyan-100 text-cyan-700' :
-                'bg-emerald-100 text-emerald-700'
-              }`}>
-                {user?.role}
-              </span>
-              
-              {/* Notification dot */}
-              <button className="relative p-2 rounded-xl bg-slate-100 hover:bg-slate-200 transition-colors">
-                <span className="text-lg">🔔</span>
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
-              </button>
-            </div>
-          </div>
-        </header>
-
         {/* Page Content */}
         <main className="p-4 sm:p-6">
           <div className="animate-fade-in">
