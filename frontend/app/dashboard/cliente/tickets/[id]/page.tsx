@@ -997,7 +997,7 @@ export default function TicketDetailPage() {
       )}
 
       {pendingStatus && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="w-full max-w-md rounded-2xl bg-white shadow-card-hover border border-slate-100 overflow-hidden">
             <div className="p-6 border-b border-slate-100">
               <div className="flex items-start gap-4">

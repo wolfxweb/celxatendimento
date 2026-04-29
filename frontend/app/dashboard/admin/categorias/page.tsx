@@ -307,7 +307,7 @@ export default function AdminCategoriasPage() {
 
       {/* Confirmation Modal */}
       {confirmModal.isOpen && confirmModal.category && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm h-screen">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm h-full">
           <div className="w-full max-w-md mx-4 rounded-2xl bg-white shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100">
               <h2 className="text-xl font-bold text-slate-800">
@@ -369,7 +369,7 @@ export default function AdminCategoriasPage() {
 
       {/* Modal de Create/Edit */}
       {modal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm h-screen">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm h-full">
           <div className="w-full max-w-lg mx-4 rounded-2xl bg-white shadow-2xl overflow-hidden">
             <div className="p-6 border-b border-slate-100">
               <h2 className="text-xl font-bold text-slate-800">
