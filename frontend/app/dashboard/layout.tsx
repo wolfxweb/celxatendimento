@@ -183,7 +183,7 @@ export default function DashboardLayout({
       {/* Main Content Area */}
       <div className={`transition-all duration-300 ${sidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
         {/* Page Content */}
-        <main className="p-4 sm:p-6">
+        <main className="p-4 sm:p-6 min-h-screen">
           <div className="animate-fade-in min-h-screen">
             {children}
           </div>
