@@ -198,12 +198,3 @@ def create_langfuse_score(
         langfuse.flush()
     except Exception as exc:
         print(f"Langfuse score failed for {name}: {exc}")
-
-    try:
-        return prompt_client.compile(**variables)
-    except Exception as exc:
-        print(f"Langfuse prompt compile failed: {exc}")
-        result = fallback
-        for key, value in variables.items():
-            result = result.replace(f"{{{{{key}}}}}", str(value))
-        return result

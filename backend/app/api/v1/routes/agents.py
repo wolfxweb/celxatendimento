@@ -77,10 +77,7 @@ async def list_agents(
     """List all agents for the company"""
 
     if not current_user.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User must belong to a company",
-        )
+        return {"agents": [], "total": 0}
 
     service = AgentService(db)
     agents = await service.get_agents(current_user.company_id)
@@ -619,10 +616,8 @@ async def get_full_config(
     """Get full configuration for all agents including prompts"""
 
     if not current_user.company_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User must belong to a company",
-        )
+        return {"agents": [], "total": 0}
+
 
     if current_user.role not in ["admin", "superadmin"]:
         raise HTTPException(
