@@ -39,7 +39,7 @@ export default function PromptEditorPage() {
           </div>
 
           <a
-            href="http://localhost:3001"
+            href={process.env.NEXT_PUBLIC_LANGFUSE_URL || "https://langfuse.celx.com.br"}
             target="_blank"
             rel="noreferrer"
             className="mt-5 inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
