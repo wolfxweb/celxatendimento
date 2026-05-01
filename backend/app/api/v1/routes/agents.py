@@ -266,7 +266,7 @@ async def update_agent(
 
     # Validate autonomy_level if provided
     if agent_data.autonomy_level:
-        valid_levels = [AutonomyLevel.LOW, AutonomyLevel.MEDIUM, AutonomyLevel.HIGH]
+        valid_levels = [AutonomyLevel.LOW, AutonomyLevel.HIGH]
         if agent_data.autonomy_level not in valid_levels:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
