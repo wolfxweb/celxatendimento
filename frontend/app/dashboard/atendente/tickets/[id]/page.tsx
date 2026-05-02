@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
-import { apiFetch, apiPatch, apiPost, apiUpload } from '@/lib/api'
+import { API_ORIGIN, apiFetch, apiPatch, apiPost, apiUpload } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 interface Attachment {
   id: number
@@ -419,7 +417,7 @@ export default function AtendenteTicketDetailPage() {
   function getAttachmentUrl(attachment: Attachment): string | undefined {
     if (!attachment.storage_url) return undefined
     if (attachment.storage_url.startsWith('http')) return attachment.storage_url
-    return `${API_URL}${attachment.storage_url}`
+    return `${API_ORIGIN}${attachment.storage_url}`
   }
 
   async function handleSendMessage(e: React.FormEvent) {

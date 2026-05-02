@@ -99,9 +99,9 @@ services:
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
       LANGFUSE_ENABLE: ${LANGFUSE_ENABLE:-true}
-      NEXT_PUBLIC_API_URL: https://celx-backend.celx.com.br/api/v1
-      NEXT_PUBLIC_APP_URL: https://atendimento.celx.com.br
-      BACKEND_CORS_ORIGINS: "https://atendimento.celx.com.br,http://localhost:3000"
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-http://localhost:3000}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     volumes:
@@ -116,7 +116,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://celx-backend.celx.com.br/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -224,15 +224,15 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: https://celx-backend.celx.com.br/api/v1
-        NEXT_PUBLIC_LANGFUSE_URL: https://langfuse.celx.com.br
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+        NEXT_PUBLIC_LANGFUSE_URL: ${NEXT_PUBLIC_LANGFUSE_URL:-http://localhost:3001}
     container_name: celx-frontend
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      NEXT_PUBLIC_API_URL: https://celx-backend.celx.com.br/api/v1
-      NEXT_PUBLIC_APP_URL: https://atendimento.celx.com.br
-      NEXT_PUBLIC_LANGFUSE_URL: https://langfuse.celx.com.br
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_LANGFUSE_URL: ${NEXT_PUBLIC_LANGFUSE_URL:-http://localhost:3001}
 
     ports:
       - "${FRONTEND_PORT:-3000}:3000"

@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import String, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +12,18 @@ from app.models.company import Company
 from app.models.user import User
 
 router = APIRouter(prefix="/companies", tags=["companies"])
+
+
+class CompanyCreateRequest(BaseModel):
+    name: str = Field(..., min_length=3, max_length=255)
+    domain: Optional[str] = Field(None, max_length=255)
+    contact_name: str = Field(..., min_length=1, max_length=255)
+    contact_email: str = Field(..., min_length=5, max_length=255)
+    contact_phone: Optional[str] = Field(None, max_length=50)
+    billing_email: Optional[str] = Field(None, max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+    timezone: str = Field(default="America/Sao_Paulo", max_length=50)
+    locale: str = Field(default="pt-BR", max_length=10)
 
 
 class RejectCompanyRequest(BaseModel):
@@ -192,3 +204,75 @@ async def suspend_company(
     await db.commit()
 
     return {"message": "Company suspended"}
+
+
+@router.post("", status_code=status.HTTP_201_CREATED, response_model=dict, include_in_schema=False)
+@router.post("/", status_code=status.HTTP_201_CREATED, response_model=dict)
+async def create_company(
+    company_data: CompanyCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_superuser),
+):
+    """Create a new company (superadmin only) with admin user"""
+
+    from app.models.user import User
+    from app.core.security import get_password_hash
+
+    if company_data.domain:
+        result = await db.execute(
+            select(Company).where(Company.domain == company_data.domain)
+        )
+        if result.scalar_one_or_none():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Domain already registered",
+            )
+
+    result = await db.execute(
+        select(Company).where(Company.contact_email == company_data.contact_email)
+    )
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered",
+        )
+
+    new_company = Company(
+        name=company_data.name,
+        domain=company_data.domain,
+        contact_name=company_data.contact_name,
+        contact_email=company_data.contact_email,
+        contact_phone=company_data.contact_phone,
+        billing_email=company_data.billing_email,
+        timezone=company_data.timezone,
+        locale=company_data.locale,
+        status="pending",
+        settings={},
+    )
+
+    db.add(new_company)
+    await db.flush()
+
+    admin_user = User(
+        company_id=new_company.id,
+        email=company_data.contact_email,
+        hashed_password=get_password_hash(company_data.password),
+        full_name=company_data.contact_name,
+        role="admin",
+        is_active=True,
+        is_email_verified=True,
+    )
+
+    db.add(admin_user)
+    await db.commit()
+    await db.refresh(new_company)
+
+    return {
+        "id": str(new_company.id),
+        "name": new_company.name,
+        "domain": new_company.domain,
+        "contact_email": new_company.contact_email,
+        "contact_name": new_company.contact_name,
+        "status": new_company.status,
+        "created_at": new_company.created_at.isoformat() if new_company.created_at else None,
+    }

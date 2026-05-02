@@ -1,6 +1,14 @@
 import { getToken } from './auth'
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const DEFAULT_API_URL = 'http://localhost:8000/api/v1'
+
+function normalizeApiUrl(url: string) {
+  const trimmedUrl = url.replace(/\/$/, '')
+  return trimmedUrl.endsWith('/api/v1') ? trimmedUrl : `${trimmedUrl}/api/v1`
+}
+
+export const API_URL = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || DEFAULT_API_URL)
+export const API_ORIGIN = API_URL.replace(/\/api\/v1$/, '')
 
 async function request<T>(
   path: string,

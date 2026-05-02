@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { apiFetch, apiPost } from '@/lib/api'
 import { formatDate } from '@/lib/utils'
+import CompanyForm from './components/CompanyForm'
 
 interface Company {
   id: string
@@ -45,6 +46,7 @@ export default function SuperAdminEmpresasPage() {
   const [error, setError] = useState('')
   const [filter, setFilter] = useState<string>('pending')
   const [processing, setProcessing] = useState<string | null>(null)
+  const [showForm, setShowForm] = useState(false)
 
   useEffect(() => {
     loadCompanies()
@@ -108,17 +110,23 @@ export default function SuperAdminEmpresasPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold">
-          <span className="bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-primary-600">
-            Gerenciar Empresas
-          </span>
-        </h1>
-        <p className="text-slate-500 mt-1">Aprovar e gerenciar empresas do sistema</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-slate-800 to-primary-600">
+              Gerenciar Empresas
+            </span>
+          </h1>
+          <p className="text-slate-500 mt-1">Aprovar e gerenciar empresas do sistema</p>
+        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary-500 to-violet-500 text-white font-medium shadow hover:shadow-glow-primary transition-all"
+        >
+          + Nova Empresa
+        </button>
       </div>
 
-      {/* Filters */}
       <div className="flex gap-2 flex-wrap p-1 bg-white rounded-2xl shadow-card-modern border border-slate-100">
         {filters.map((f) => (
           <button
@@ -169,7 +177,7 @@ export default function SuperAdminEmpresasPage() {
             <tbody className="divide-y divide-slate-100">
               {companies.map((company) => {
                 const statusStyle = STATUS_STYLES[company.status] || STATUS_STYLES.pending
-                
+
                 return (
                   <tr key={company.id} className="group hover:bg-gradient-to-r hover:from-primary-50/30 hover:to-violet-50/30 transition-all duration-300">
                     <td className="px-6 py-4">
@@ -250,6 +258,16 @@ export default function SuperAdminEmpresasPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {showForm && (
+        <CompanyForm
+          onSuccess={() => {
+            setShowForm(false)
+            loadCompanies()
+          }}
+          onClose={() => setShowForm(false)}
+        />
       )}
     </div>
   )

@@ -332,6 +332,62 @@ CREATE INDEX idx_tickets_created ON tickets(created_at);
 CREATE INDEX idx_tickets_number ON tickets(ticket_number);
 
 -- =====================================================
+-- RESPOSTAS AI (Ticket AI Responses)
+-- =====================================================
+
+CREATE TABLE ticket_ai_response (
+    id SERIAL PRIMARY KEY,
+    ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
+    
+    -- Resposta gerada pela IA
+    response_text TEXT NOT NULL,
+    
+    -- Contexto usado (RAG + ticket info)
+    context_used JSONB NOT NULL,  -- {
+                                   --   "rag_sources": [...],
+                                   --   "ticket_subject": "...",
+                                   --   "ticket_category": "...",
+                                   --   "retrieval_score": 0.85
+                                   -- }
+    
+    -- Config do atendente usado
+    config_snapshot JSONB NOT NULL,  -- {
+                                      --   "model": "gpt-4o",
+                                      --   "temperature": 0.7,
+                                      --   "prompt_hash": "abc123",
+                                      --   "tools_used": ["rag"]
+                                      -- }
+    
+    -- Timing
+    generated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    processing_time_ms INTEGER,
+    
+    -- Status da aprovação
+    status ai_response_status DEFAULT 'pending',
+    
+    -- Atendente que aprovou/rejeitou
+    reviewed_by INTEGER REFERENCES users(id),
+    reviewed_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Feedback do atendente sobre a resposta da IA
+    ai_rating INTEGER CHECK (ai_rating >= 1 AND ai_rating <= 5),
+    ai_feedback TEXT,
+    rejection_reason VARCHAR(100),
+    
+    -- Flags para aprendizado
+    is_example_good BOOLEAN DEFAULT FALSE,
+    is_example_bad BOOLEAN DEFAULT FALSE,
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_ai_response_ticket ON ticket_ai_response(ticket_id);
+CREATE INDEX idx_ai_response_status ON ticket_ai_response(status);
+CREATE INDEX idx_ai_response_rating ON ticket_ai_response(ai_rating);
+CREATE INDEX idx_ai_response_reviewed ON ticket_ai_response(reviewed_by);
+
+-- =====================================================
 -- MENSAGENS DE TICKET (Ticket Messages)
 -- =====================================================
 
@@ -415,60 +471,6 @@ CREATE INDEX idx_attachments_active ON ticket_attachments(is_active);
 
 -- =====================================================
 -- RESPOSTAS AI (Ticket AI Responses)
--- =====================================================
-
-CREATE TABLE ticket_ai_response (
-    id SERIAL PRIMARY KEY,
-    ticket_id INTEGER NOT NULL REFERENCES tickets(id) ON DELETE CASCADE,
-    
-    -- Resposta gerada pela IA
-    response_text TEXT NOT NULL,
-    
-    -- Contexto usado (RAG + ticket info)
-    context_used JSONB NOT NULL,  -- {
-                                   --   "rag_sources": [...],
-                                   --   "ticket_subject": "...",
-                                   --   "ticket_category": "...",
-                                   --   "retrieval_score": 0.85
-                                   -- }
-    
-    -- Config do atendente usado
-    config_snapshot JSONB NOT NULL,  -- {
-                                      --   "model": "gpt-4o",
-                                      --   "temperature": 0.7,
-                                      --   "prompt_hash": "abc123",
-                                      --   "tools_used": ["rag"]
-                                      -- }
-    
-    -- Timing
-    generated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    processing_time_ms INTEGER,
-    
-    -- Status da aprovação
-    status ai_response_status DEFAULT 'pending',
-    
-    -- Atendente que aprovou/rejeitou
-    reviewed_by INTEGER REFERENCES users(id),
-    reviewed_at TIMESTAMP WITH TIME ZONE,
-    
-    -- Feedback do atendente sobre a resposta da IA
-    ai_rating INTEGER CHECK (ai_rating >= 1 AND ai_rating <= 5),
-    ai_feedback TEXT,
-    rejection_reason VARCHAR(100),
-    
-    -- Flags para aprendizado
-    is_example_good BOOLEAN DEFAULT FALSE,
-    is_example_bad BOOLEAN DEFAULT FALSE,
-    
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE INDEX idx_ai_response_ticket ON ticket_ai_response(ticket_id);
-CREATE INDEX idx_ai_response_status ON ticket_ai_response(status);
-CREATE INDEX idx_ai_response_rating ON ticket_ai_response(ai_rating);
-CREATE INDEX idx_ai_response_reviewed ON ticket_ai_response(reviewed_by);
-
 -- =====================================================
 -- LOG DE FEEDBACK AI (AI Feedback Log)
 -- =====================================================
@@ -635,6 +637,43 @@ CREATE INDEX idx_knowledge_indexed ON knowledge_base(is_indexed);
 -- CREATE INDEX idx_knowledge_embedding ON knowledge_base USING ivfflat (embedding vector_cosine_ops);  -- Enable with pgvector
 
 -- =====================================================
+-- PROVIDERS DE AI (AI Providers)
+-- =====================================================
+
+CREATE TABLE ai_providers (
+    id SERIAL PRIMARY KEY,
+    name ai_provider_name NOT NULL UNIQUE,
+    display_name VARCHAR(100) NOT NULL,
+    api_url VARCHAR(500),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+INSERT INTO ai_providers (name, display_name, api_url) VALUES
+('openrouter', 'OpenRouter', 'https://openrouter.ai/api/v1'),
+('openai', 'OpenAI', 'https://api.openai.com/v1'),
+('anthropic', 'Anthropic', 'https://api.anthropic.com/v1'),
+('local', 'Local/Ollama', 'http://localhost:11434/v1');
+
+-- =====================================================
+-- MODELOS DE AI (AI Models)
+-- =====================================================
+
+CREATE TABLE ai_models (
+    id SERIAL PRIMARY KEY,
+    provider_id INTEGER NOT NULL REFERENCES ai_providers(id),
+    name VARCHAR(100) NOT NULL,
+    display_name VARCHAR(100) NOT NULL,
+    model_type ai_model_type NOT NULL,
+    max_tokens INTEGER,
+    embedding_dimensions INTEGER,
+    supports_function_calling BOOLEAN DEFAULT FALSE,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(provider_id, name, model_type)
+);
+
+-- =====================================================
 -- CONFIGURAÇÃO AI DA EMPRESA (Company AI Config)
 -- =====================================================
 
@@ -673,43 +712,6 @@ CREATE TABLE company_ai_config (
 );
 
 CREATE INDEX idx_company_ai_config_company ON company_ai_config(company_id);
-
--- =====================================================
--- PROVIDERS DE AI (AI Providers)
--- =====================================================
-
-CREATE TABLE ai_providers (
-    id SERIAL PRIMARY KEY,
-    name ai_provider_name NOT NULL UNIQUE,
-    display_name VARCHAR(100) NOT NULL,
-    api_url VARCHAR(500),
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-INSERT INTO ai_providers (name, display_name, api_url) VALUES
-('openrouter', 'OpenRouter', 'https://openrouter.ai/api/v1'),
-('openai', 'OpenAI', 'https://api.openai.com/v1'),
-('anthropic', 'Anthropic', 'https://api.anthropic.com/v1'),
-('local', 'Local/Ollama', 'http://localhost:11434/v1');
-
--- =====================================================
--- MODELOS DE AI (AI Models)
--- =====================================================
-
-CREATE TABLE ai_models (
-    id SERIAL PRIMARY KEY,
-    provider_id INTEGER NOT NULL REFERENCES ai_providers(id),
-    name VARCHAR(100) NOT NULL,
-    display_name VARCHAR(100) NOT NULL,
-    model_type ai_model_type NOT NULL,
-    max_tokens INTEGER,
-    embedding_dimensions INTEGER,
-    supports_function_calling BOOLEAN DEFAULT FALSE,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE(provider_id, name, model_type)
-);
 
 -- Modelos LLM via OpenRouter (ordenados por preço: mais barato primeiro)
 -- Formato: provider/model (OpenRouter API)
